@@ -1,0 +1,18 @@
+# 本地/服务器从源码直接构建（不依赖 GHCR）
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# 或单独：
+#   docker compose -f docker-compose.build.yml up -d --build
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: captail/backend:local
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: captail/frontend:local
