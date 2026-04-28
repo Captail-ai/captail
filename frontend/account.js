@@ -162,16 +162,44 @@ function tbl(heads, rows) {
   </table>`;
 }
 
-/* ================ DEPOSIT（直接跳转客服） ================ */
+/* ================ DEPOSIT（金额 + 联系客服） ================ */
 async function viewDeposit(el) {
   el.innerHTML = `<div class="page-head"><div class="wide">
     <h1>${t('deposit.title')}</h1><p>${t('deposit.sub')}</p></div></div>
-    <div class="wide"><div class="card" style="text-align:center;padding:48px 24px;max-width:560px;margin:0 auto">
-      <div style="font-size:48px;margin-bottom:12px">💬</div>
-      <h3 style="margin:0 0 12px">${t('deposit.contact_title')}</h3>
-      <p style="color:var(--text-500);margin:0 0 24px;line-height:1.7">${t('deposit.contact_tip')}</p>
-      <a href="#/service" class="btn primary big">${t('deposit.contact_btn')} →</a>
+    <div class="wide"><div class="card deposit-card">
+      <form id="dep-form" class="space-y">
+        <div class="field">
+          <label class="dep-amount-label">${t('deposit.amount')}</label>
+          <div class="dep-amount-row">
+            <input name="amount" type="number" min="1" step="0.01" required
+                   placeholder="10000" autocomplete="off"/>
+            <span class="dep-currency">USD</span>
+          </div>
+        </div>
+        <button class="btn primary block big" type="submit">${t('deposit.contact_btn')}</button>
+        <div class="msg" id="dep-msg"></div>
+      </form>
     </div></div>`;
+
+  document.getElementById('dep-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const amount = Number(fd.get('amount'));
+    const msg = document.getElementById('dep-msg');
+    if (!(amount > 0)) {
+      msg.className = 'msg'; msg.textContent = t('deposit.amount_required'); return;
+    }
+    try {
+      await R.api('/api/deposit-requests', {
+        method: 'POST',
+        body: { method: 'service', amount },
+      });
+      R.toast(t('deposit.success'), 'ok');
+      location.hash = '#/service';
+    } catch (err) {
+      msg.className = 'msg'; msg.textContent = err.message;
+    }
+  });
 }
 
 /* ================ WITHDRAW（4 通道 + QR + 1% 手续费 + 每日 3 次） ================ */
@@ -286,8 +314,8 @@ async function viewKyc(el) {
   const advStatus = k.advanced_status || 'unsubmitted';
   const basicLocked = lvl >= 1; // 初级已通过 → 表单只读
 
-  document.getElementById('kyc-wrap').innerHTML = `
-    <div class="grid-2">
+  // 初级未通过时仅展示初级卡片（占满宽度）；通过后才出现高级卡片
+  const basicCard = `
       <div class="card">
         <h3>${t('kyc.basic.title')}
           <span class="badge ${lvl >= 1 ? 'approved' : 'pending'}" style="margin-left:8px">
@@ -307,15 +335,16 @@ async function viewKyc(el) {
           <button class="btn primary block" type="submit" ${basicLocked ? 'disabled' : ''}>${t('kyc.basic.submit')}</button>
           <div class="msg" id="kyc-basic-msg"></div>
         </form>
-      </div>
+      </div>`;
+
+  const advancedCard = lvl < 1 ? '' : `
       <div class="card">
         <h3>${t('kyc.advanced.title')}
           <span class="badge ${lvl >= 2 ? 'approved' : advStatus}" style="margin-left:8px">
             ${lvl >= 2 ? t('kyc.advanced.passed') : statusText(advStatus)}</span></h3>
         <p style="color:var(--text-500);font-size:13px;margin-bottom:12px">${t('kyc.advanced.desc')}</p>
-        ${lvl < 1 ? `<div class="msg">${t('kyc.advanced.need_basic')}</div>` : ''}
         ${lvl >= 2 ? `<div class="msg ok">${t('kyc.advanced.reward_received')}</div>` : `
-        <form id="kyc-advanced" enctype="multipart/form-data" ${lvl < 1 || advStatus === 'reviewing' ? 'style="opacity:.55;pointer-events:none"' : ''}>
+        <form id="kyc-advanced" enctype="multipart/form-data" ${advStatus === 'reviewing' ? 'style="opacity:.55;pointer-events:none"' : ''}>
           <div class="field"><label>${t('kyc.id_front')}</label>
             <input type="file" name="id_front" accept="image/*" required/></div>
           <div class="field"><label>${t('kyc.id_back')}</label>
@@ -327,8 +356,11 @@ async function viewKyc(el) {
           <div class="msg" id="kyc-adv-msg"></div>
         </form>`}
         <p style="color:var(--text-500);font-size:13px;margin-top:16px">🔒 ${t('kyc.tip')}</p>
-      </div>
-    </div>`;
+      </div>`;
+
+  document.getElementById('kyc-wrap').innerHTML = lvl < 1
+    ? `<div style="max-width:560px;margin:0 auto">${basicCard}</div>`
+    : `<div class="grid-2">${basicCard}${advancedCard}</div>`;
 
   if (!basicLocked) {
     document.getElementById('kyc-basic').addEventListener('submit', async (e) => {

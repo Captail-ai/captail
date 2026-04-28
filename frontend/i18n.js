@@ -85,11 +85,13 @@ const dict = {
     'assets.transfer.success': '划转成功',
     'assets.transfer.tip': '现货 ↔ 期权 即时划转，无手续费',
 
-    'deposit.title': '充值', 'deposit.sub': '请联系在线客服办理充值',
+    'deposit.title': '存款', 'deposit.sub': '请输入金额并联系客服办理',
     'deposit.contact_title': '请联系在线客服充值',
     'deposit.contact_tip': '为保障资金安全，平台暂不支持自助充值。请联系在线客服，专员会指导您完成充值流程。',
-    'deposit.contact_btn': '联系在线客服',
-    'deposit.method': '充值方式', 'deposit.amount': '充值金额',
+    'deposit.contact_btn': '联系客服',
+    'deposit.method': '充值方式', 'deposit.amount': '金额',
+    'deposit.amount_required': '请输入正确的金额',
+    'deposit.success': '已提交，正在为您接通客服…',
     'deposit.history': '充值记录',
 
     'withdraw.title': '提现', 'withdraw.sub': '从现货钱包提现，需先完成 KYC 初级认证',
@@ -381,11 +383,13 @@ const dict = {
     'assets.transfer.success': 'Transfer completed',
     'assets.transfer.tip': 'Instant Spot ↔ Option transfers, no fees',
 
-    'deposit.title': 'Deposit', 'deposit.sub': 'Please contact customer service to deposit funds',
+    'deposit.title': 'Deposit', 'deposit.sub': 'Enter an amount and contact support to proceed',
     'deposit.contact_title': 'Please contact customer service',
     'deposit.contact_tip': 'For your security, self-service deposits are disabled. Please contact our support team and an agent will guide you through the process.',
-    'deposit.contact_btn': 'Contact Support',
+    'deposit.contact_btn': 'Contact Service',
     'deposit.method': 'Method', 'deposit.amount': 'Amount',
+    'deposit.amount_required': 'Please enter a valid amount',
+    'deposit.success': 'Submitted. Connecting you to support…',
     'deposit.history': 'Deposit History',
 
     'withdraw.title': 'Withdraw', 'withdraw.sub': 'Withdraw from Spot wallet — KYC level 1 required',

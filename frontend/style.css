@@ -549,6 +549,17 @@ table.list .sell { color: var(--down); font-weight: 600; }
   color: var(--text-700); font-size: 14px; margin-right: 18px; }
 .chk input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-500); }
 
+/* ============ Deposit (amount + contact service) ============ */
+.deposit-card { max-width: 520px; margin: 0 auto; padding: 28px 24px; }
+.dep-amount-label { display: block; text-align: center; font-weight: 600;
+  margin-bottom: 10px; color: var(--text-700); }
+.dep-amount-row { display: flex; gap: 10px; align-items: stretch; }
+.dep-amount-row input { flex: 1; font-size: 16px; padding: 12px 14px; }
+.dep-currency { display: inline-flex; align-items: center; padding: 0 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg-100);
+  color: var(--text-700); font-weight: 600; letter-spacing: .5px; }
+
+
 /* ============ Customer service floating widget ============ */
 .cs-bubble { position: fixed; right: 22px; bottom: 22px; width: 52px; height: 52px;
   border-radius: 50%; border: 0; color: #fff; font-size: 22px; z-index: 70;
