@@ -37,7 +37,8 @@ function ensureAdmin() {
   const info = db.prepare(
     'INSERT INTO users(username, password, is_admin, email_verified, created_at) VALUES (?,?,?,?,?)'
   ).run('admin', hash, 1, 1, Date.now());
-  db.prepare('INSERT INTO accounts(user_id, cash) VALUES (?, ?)').run(info.lastInsertRowid, 0);
+  db.prepare('INSERT INTO accounts(user_id, spot_cash, option_cash) VALUES (?, 0, 0)')
+    .run(info.lastInsertRowid);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,8 +57,9 @@ function register(username, password, email) {
   const info = db.prepare(
     `INSERT INTO users(username, password, email, email_verified, created_at) VALUES (?,?,?,?,?)`
   ).run(username, hash, email, autoVerify, now);
-  // 赠送 100,000 USD 模拟初始资金
-  db.prepare('INSERT INTO accounts(user_id, cash) VALUES (?, ?)').run(info.lastInsertRowid, 100000);
+  // 赠送 100,000 USD 试玩金 — 进入期权钱包（现货钱包仍为 0，需 KYC 后充值）
+  db.prepare('INSERT INTO accounts(user_id, spot_cash, option_cash) VALUES (?, 0, ?)')
+    .run(info.lastInsertRowid, 100000);
   const user = { id: info.lastInsertRowid, username, email_verified: !!autoVerify };
   // 仅当账号已完成邮箱验证时，才返回可用 token
   const token = autoVerify ? signToken({ id: user.id, username, is_admin: 0 }) : null;

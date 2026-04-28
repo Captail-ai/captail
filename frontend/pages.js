@@ -208,28 +208,23 @@ async function viewNews(el) {
   }
 }
 
-/* ================= 常见问题 ================= */
-const FAQ_ZH = [
-  ['如何开立 Captail 账户？', '点击右上角「注册」，填写用户名和密码即可创建账户，新用户自动获得 100,000 USD 模拟资金。'],
-  ['支持哪些交易品种？', '目前支持 XAU（黄金）、XAG（白银）、XPT（铂金）、XPD（钯金）与美元的交易对。'],
-  ['出入金需要多长时间？', '银行电汇通常 1~3 个工作日到账；USDT 与数字钱包通常在 15 分钟内到账。'],
-  ['是否需要完成 KYC 身份认证？', '基础交易无需认证，但充值、提现及超过一定额度的操作需要完成 KYC 审核。'],
-  ['平台手续费是多少？', '当前挂牌手续费为 0.05%，按成交金额结算；VIP 用户享受折扣。'],
-  ['资金安全如何保障？', '全流程 JWT 鉴权 + 操作分级 + 冷热钱包分离 + 独立审计，最大程度保障资金安全。'],
-];
-const FAQ_EN = [
-  ['How do I open an account?', 'Click "Sign Up" at the top-right, enter a username and password, and receive 100,000 USD demo capital automatically.'],
-  ['Which instruments are supported?', 'XAU (Gold), XAG (Silver), XPT (Platinum) and XPD (Palladium) against USD.'],
-  ['How long do deposits and withdrawals take?', 'Bank wires 1–3 business days; USDT and digital wallets usually within 15 minutes.'],
-  ['Do I need to complete KYC?', 'KYC is not required for paper trading, but is mandatory for deposits/withdrawals above certain limits.'],
-  ['What are the fees?', 'A flat 0.05% taker fee on notional; VIP tiers unlock further discounts.'],
-  ['How are my funds secured?', 'JWT auth, role-based controls, cold/hot wallet segregation and third-party audits.'],
-];
-function viewFAQ(el) {
-  const faqs = getLang() === 'en' ? FAQ_EN : FAQ_ZH;
+/* ================= 常见问题（后台配置） ================= */
+async function viewFAQ(el) {
   el.innerHTML = `<div class="page-head"><div class="wide"><h1>${t('faq.title')}</h1><p>${t('faq.sub')}</p></div></div>
-    <div class="wide"><div class="faq">${faqs.map(([q, a]) => `
-      <details><summary>${q}</summary><div class="body">${a}</div></details>`).join('')}</div></div>`;
+    <div class="wide"><div id="faq-wrap">${t('common.loading')}</div></div>`;
+  try {
+    const list = await R.api('/api/faqs', { auth: false });
+    const en = getLang() === 'en';
+    const wrap = document.getElementById('faq-wrap');
+    if (!list.length) { wrap.innerHTML = `<div class="empty-box">${t('common.empty')}</div>`; return; }
+    wrap.innerHTML = `<div class="faq">${list.map(f => {
+      const q = en ? (f.question_en || f.question_zh) : (f.question_zh || f.question_en);
+      const a = en ? (f.answer_en || f.answer_zh) : (f.answer_zh || f.answer_en);
+      return `<details><summary>${q}</summary><div class="body">${a}</div></details>`;
+    }).join('')}</div>`;
+  } catch (e) {
+    document.getElementById('faq-wrap').innerHTML = `<div class="msg">${e.message}</div>`;
+  }
 }
 
 /* ================= 在线客服 ================= */
@@ -388,48 +383,101 @@ async function viewProfile(el) {
   }
 }
 
-/* ================= 理财 ================= */
-const FINANCE_PLANS = [
-  { key: 'stable', apr: '5.2%', term: '30d',  min: 1000,  color: 'blue' },
-  { key: 'growth', apr: '8.8%', term: '90d',  min: 5000,  color: 'gold' },
-  { key: 'flex',   apr: '3.5%', term: 'T+0',  min: 100,   color: 'green' },
-];
-function viewFinance(el) {
+/* ================= 理财（后台配置） ================= */
+async function viewFinance(el) {
   if (!features.finance) return renderFeatureDisabled(el, 'finance.title');
   el.innerHTML = `
     <div class="page-head"><div class="wide"><h1>${t('finance.title')}</h1><p>${t('finance.sub')}</p></div></div>
-    <div class="wide"><div class="plan-grid">
-      ${FINANCE_PLANS.map(p => `
-        <div class="plan-card ${p.color}">
-          <div class="plan-head"><span class="tag">${t('finance.plan.' + p.key)}</span></div>
-          <div class="plan-apr"><b>${p.apr}</b><small>${t('finance.apr')}</small></div>
-          <div class="plan-rows">
-            <div><span>${t('finance.term')}</span><b>${p.term}</b></div>
-            <div><span>${t('finance.min')}</span><b>$${p.min.toLocaleString()}</b></div>
-          </div>
-          <a href="#/login" class="btn primary block">${t('finance.subscribe')}</a>
-        </div>`).join('')}
-    </div></div>`;
+    <div class="wide"><div id="fin-wrap">${t('common.loading')}</div></div>`;
+  try {
+    const list = await R.api('/api/finance/products', { auth: false });
+    const en = getLang() === 'en';
+    const wrap = document.getElementById('fin-wrap');
+    if (!list.length) { wrap.innerHTML = `<div class="empty-box">${t('common.empty')}</div>`; return; }
+    const colors = ['blue', 'gold', 'green', 'purple'];
+    wrap.innerHTML = `<div class="plan-grid">${list.map((p, i) => {
+      const name = en ? (p.name_en || p.name_zh) : (p.name_zh || p.name_en);
+      const desc = en ? (p.description_en || p.description_zh || '') : (p.description_zh || p.description_en || '');
+      const apy = (p.daily_rate * 365 * 100).toFixed(2) + '%';
+      const left = p.total_quota > 0 ? Math.max(0, p.total_quota - p.sold_quota) : null;
+      return `<div class="plan-card ${colors[i % colors.length]}">
+        <div class="plan-head">
+          <span class="tag">${name}</span>
+          ${p.vip_tag ? `<span class="badge approved">${p.vip_tag}</span>` : ''}
+        </div>
+        <div class="plan-apr"><b>${apy}</b><small>${t('finance.apy')}</small></div>
+        <div class="plan-rows">
+          <div><span>${t('finance.daily_rate')}</span><b>${(p.daily_rate * 100).toFixed(3)}%</b></div>
+          <div><span>${t('finance.lock')}</span><b>${p.lock_days} ${t('finance.days')}</b></div>
+          <div><span>${t('finance.range')}</span><b>$${p.min_amount}-${p.max_amount}</b></div>
+          ${left !== null ? `<div><span>${t('finance.quota_left')}</span><b>$${R.fmt(left)}</b></div>` : ''}
+        </div>
+        ${desc ? `<p style="font-size:13px;color:var(--text-500);margin:10px 0">${desc}</p>` : ''}
+        <button class="btn primary block" data-fin="${p.id}" data-min="${p.min_amount}" data-max="${p.max_amount}">${t('finance.subscribe')}</button>
+      </div>`;
+    }).join('')}</div>`;
+    wrap.querySelectorAll('button[data-fin]').forEach(b => {
+      b.addEventListener('click', () => subscribeFinance(
+        Number(b.dataset.fin), Number(b.dataset.min), Number(b.dataset.max)));
+    });
+  } catch (e) {
+    document.getElementById('fin-wrap').innerHTML = `<div class="msg">${e.message}</div>`;
+  }
+}
+async function subscribeFinance(productId, min, max) {
+  if (!localStorage.getItem('token')) return R.navigate('/login');
+  const amt = Number(prompt(t('finance.amount_prompt') + ` (${min}-${max})`));
+  if (!amt || amt < min || amt > max) return;
+  try {
+    await R.api('/api/finance/subscribe', { method: 'POST',
+      body: { product_id: productId, amount: amt } });
+    R.toast(t('finance.subscribe_ok'), 'ok');
+    R.navigate('/assets');
+  } catch (e) { R.toast(e.message, 'error'); }
 }
 
-/* ================= 借贷 ================= */
-const LOAN_PRODUCTS = [
-  { sym: 'XAU', ltv: '70%', rate: '0.028%', term: '7 / 30 / 90d' },
-  { sym: 'XAG', ltv: '65%', rate: '0.033%', term: '7 / 30 / 90d' },
-  { sym: 'XPT', ltv: '60%', rate: '0.035%', term: '7 / 30 / 90d' },
-  { sym: 'XPD', ltv: '55%', rate: '0.040%', term: '7 / 30 / 90d' },
-];
-function viewLoan(el) {
+/* ================= 借贷（后台配置） ================= */
+async function viewLoan(el) {
   if (!features.loan) return renderFeatureDisabled(el, 'loan.title');
   el.innerHTML = `
     <div class="page-head"><div class="wide"><h1>${t('loan.title')}</h1><p>${t('loan.sub')}</p></div></div>
-    <div class="wide"><table class="list">
-      <thead><tr><th>${t('trading.col.symbol')}</th><th>${t('loan.ltv')}</th>
-        <th>${t('loan.rate')}</th><th>${t('loan.term')}</th><th></th></tr></thead>
-      <tbody>${LOAN_PRODUCTS.map(p => `<tr>
-        <td><b>${p.sym}/USD</b></td><td>${p.ltv}</td><td>${p.rate}</td>
-        <td>${p.term}</td><td><a href="#/login" class="btn outline small">${t('loan.apply')}</a></td>
-      </tr>`).join('')}</tbody></table></div>`;
+    <div class="wide"><div id="loan-wrap">${t('common.loading')}</div></div>`;
+  try {
+    const list = await R.api('/api/loan/products', { auth: false });
+    const en = getLang() === 'en';
+    const wrap = document.getElementById('loan-wrap');
+    if (!list.length) { wrap.innerHTML = `<div class="empty-box">${t('common.empty')}</div>`; return; }
+    wrap.innerHTML = `<table class="list">
+      <thead><tr><th>${t('loan.product')}</th><th>${t('loan.rate')}</th>
+        <th>${t('loan.term')}</th><th>${t('finance.range')}</th><th></th></tr></thead>
+      <tbody>${list.map(p => {
+        const name = en ? (p.name_en || p.name_zh) : (p.name_zh || p.name_en);
+        return `<tr>
+          <td><b>${name}</b></td>
+          <td>${(p.daily_rate * 100).toFixed(3)}% / ${t('finance.day')}</td>
+          <td>${p.term_days} ${t('finance.days')}</td>
+          <td>$${p.min_amount}-${p.max_amount}</td>
+          <td><button class="btn outline small" data-loan="${p.id}" data-min="${p.min_amount}" data-max="${p.max_amount}" data-term="${p.term_days}">${t('loan.apply')}</button></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+    wrap.querySelectorAll('button[data-loan]').forEach(b => {
+      b.addEventListener('click', () => applyLoan(
+        Number(b.dataset.loan), Number(b.dataset.min), Number(b.dataset.max), Number(b.dataset.term)));
+    });
+  } catch (e) {
+    document.getElementById('loan-wrap').innerHTML = `<div class="msg">${e.message}</div>`;
+  }
+}
+async function applyLoan(productId, min, max, termDays) {
+  if (!localStorage.getItem('token')) return R.navigate('/login');
+  const amt = Number(prompt(t('loan.amount_prompt') + ` (${min}-${max})`));
+  if (!amt || amt < min || amt > max) return;
+  try {
+    await R.api('/api/loan/apply', { method: 'POST',
+      body: { product_id: productId, amount: amt, term_days: termDays } });
+    R.toast(t('loan.apply_ok'), 'ok');
+    R.navigate('/assets');
+  } catch (e) { R.toast(e.message, 'error'); }
 }
 
 /* ================= 关于我们 ================= */
@@ -449,6 +497,8 @@ function viewAbout(el) {
       </div>
     </div>`;
 }
+
+/* 秒级合约功能已并入 /trading 的「期权」二级 tab；旧 viewSeconds 已删除 */
 
 function view404(el) {
   el.innerHTML = `<div class="page"><div class="wide" style="text-align:center;padding:120px 20px">

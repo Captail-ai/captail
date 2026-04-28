@@ -131,9 +131,9 @@ describe('settings', () => {
 });
 
 describe('admin_ops audit log', () => {
-  test('cash mutation writes an op record with before/after', async () => {
+  test('cash mutation writes an op record with before/after wallet snapshots', async () => {
     await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
-      .send({ mode: 'adjust', amount: 1234 });
+      .send({ wallet: 'spot', mode: 'adjust', amount: 1234 });
     const r = await request(app).get('/api/admin/ops?target=' + userId).set(auth(adminToken));
     expect(r.status).toBe(200);
     const op = r.body.find(o => o.action === 'cash.adjust');
@@ -141,8 +141,9 @@ describe('admin_ops audit log', () => {
     expect(op.admin_username).toBe('admin');
     expect(op.target_user_id).toBe(userId);
     expect(op.details.amount).toBe(1234);
-    expect(typeof op.details.before).toBe('number');
-    expect(op.details.after).toBe(op.details.before + 1234);
+    expect(op.details.wallet).toBe('spot');
+    expect(typeof op.details.before.spot_cash).toBe('number');
+    expect(op.details.after.spot_cash).toBe(op.details.before.spot_cash + 1234);
   });
 
   test('profile edit is logged with changed fields', async () => {

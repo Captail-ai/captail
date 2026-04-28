@@ -80,8 +80,8 @@ function renderHeader() {
   const name = (a.user && (a.user.username || '').slice(0, 2).toUpperCase()) || 'U';
   const navLinks = [
     ['/', 'nav.home'], ['/market', 'nav.market'], ['/trading', 'nav.trading'],
-    ['/assets', 'nav.assets'], ['/news', 'nav.news'], ['/faq', 'nav.faq'],
-    ['/service', 'nav.service'],
+    ['/assets', 'nav.assets'],
+    ['/news', 'nav.news'], ['/faq', 'nav.faq'], ['/service', 'nav.service'],
   ];
   el.innerHTML = `
     <div class="wide nav">

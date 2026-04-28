@@ -6,12 +6,116 @@ const tabs = [
   { k: 'kyc',       key: 'admin.tab.kyc' },
   { k: 'deposits',  key: 'admin.tab.deposits' },
   { k: 'withdraws', key: 'admin.tab.withdraws' },
+  { k: 'loan_apps', key: 'admin.tab.loan_apps' },
   { k: 'messages',  key: 'admin.tab.messages' },
   { k: 'news',      key: 'admin.tab.news' },
+  { k: 'options',   key: 'admin.tab.options' },
+  { k: 'finance',   key: 'admin.tab.finance' },
+  { k: 'loans',     key: 'admin.tab.loans' },
+  { k: 'faqs',      key: 'admin.tab.faqs' },
   { k: 'ops',       key: 'admin.tab.ops' },
   { k: 'security',  key: 'admin.tab.security' },
   { k: 'settings',  key: 'admin.tab.settings' },
 ];
+
+// 可配置实体的元数据，驱动 CRUD 表与表单
+const CFG_ENTITIES = {
+  options: {
+    endpoint: '/api/admin/option-periods',
+    cols: [
+      ['id', '#'],
+      ['duration_sec', 'admin.opt.duration'],
+      ['payout_rate', 'admin.opt.payout'],
+      ['min_amount', 'admin.opt.min'],
+      ['max_amount', 'admin.opt.max'],
+      ['label_zh', 'admin.opt.label_zh'],
+      ['sort_order', 'admin.cfg.sort'],
+      ['enabled', 'admin.cfg.enabled'],
+    ],
+    fields: [
+      { k: 'duration_sec', label: 'admin.opt.duration', type: 'number', step: 1, required: true },
+      { k: 'payout_rate',  label: 'admin.opt.payout',   type: 'number', step: 0.01, required: true },
+      { k: 'min_amount',   label: 'admin.opt.min',      type: 'number', step: 1 },
+      { k: 'max_amount',   label: 'admin.opt.max',      type: 'number', step: 1 },
+      { k: 'label_zh',     label: 'admin.opt.label_zh', type: 'text' },
+      { k: 'label_en',     label: 'admin.opt.label_en', type: 'text' },
+      { k: 'sort_order',   label: 'admin.cfg.sort',     type: 'number', step: 1 },
+      { k: 'enabled',      label: 'admin.cfg.enabled',  type: 'checkbox' },
+    ],
+  },
+  finance: {
+    endpoint: '/api/admin/finance/products',
+    cols: [
+      ['id', '#'],
+      ['name_zh', 'admin.fin.name_zh'],
+      ['vip_tag', 'admin.fin.vip_tag'],
+      ['daily_rate', 'admin.fin.daily_rate'],
+      ['min_amount', 'admin.opt.min'],
+      ['max_amount', 'admin.opt.max'],
+      ['lock_days', 'admin.fin.lock_days'],
+      ['sold_quota', 'admin.fin.sold_quota'],
+      ['sort_order', 'admin.cfg.sort'],
+      ['enabled', 'admin.cfg.enabled'],
+    ],
+    fields: [
+      { k: 'name_zh',        label: 'admin.fin.name_zh',    type: 'text', required: true },
+      { k: 'name_en',        label: 'admin.fin.name_en',    type: 'text', required: true },
+      { k: 'vip_tag',        label: 'admin.fin.vip_tag',    type: 'text' },
+      { k: 'daily_rate',     label: 'admin.fin.daily_rate', type: 'number', step: 0.0001, required: true },
+      { k: 'min_amount',     label: 'admin.opt.min',        type: 'number', step: 1 },
+      { k: 'max_amount',     label: 'admin.opt.max',        type: 'number', step: 1 },
+      { k: 'lock_days',      label: 'admin.fin.lock_days',  type: 'number', step: 1 },
+      { k: 'total_quota',    label: 'admin.fin.total_quota', type: 'number', step: 1 },
+      { k: 'description_zh', label: 'admin.fin.desc_zh',    type: 'textarea' },
+      { k: 'description_en', label: 'admin.fin.desc_en',    type: 'textarea' },
+      { k: 'sort_order',     label: 'admin.cfg.sort',       type: 'number', step: 1 },
+      { k: 'enabled',        label: 'admin.cfg.enabled',    type: 'checkbox' },
+    ],
+  },
+  loans: {
+    endpoint: '/api/admin/loan/products',
+    cols: [
+      ['id', '#'],
+      ['name_zh', 'admin.fin.name_zh'],
+      ['daily_rate', 'admin.fin.daily_rate'],
+      ['min_amount', 'admin.opt.min'],
+      ['max_amount', 'admin.opt.max'],
+      ['term_days', 'admin.loan.term_days'],
+      ['sort_order', 'admin.cfg.sort'],
+      ['enabled', 'admin.cfg.enabled'],
+    ],
+    fields: [
+      { k: 'name_zh',        label: 'admin.fin.name_zh',    type: 'text', required: true },
+      { k: 'name_en',        label: 'admin.fin.name_en',    type: 'text', required: true },
+      { k: 'daily_rate',     label: 'admin.fin.daily_rate', type: 'number', step: 0.0001, required: true },
+      { k: 'min_amount',     label: 'admin.opt.min',        type: 'number', step: 1 },
+      { k: 'max_amount',     label: 'admin.opt.max',        type: 'number', step: 1 },
+      { k: 'term_days',      label: 'admin.loan.term_days', type: 'number', step: 1 },
+      { k: 'description_zh', label: 'admin.fin.desc_zh',    type: 'textarea' },
+      { k: 'description_en', label: 'admin.fin.desc_en',    type: 'textarea' },
+      { k: 'sort_order',     label: 'admin.cfg.sort',       type: 'number', step: 1 },
+      { k: 'enabled',        label: 'admin.cfg.enabled',    type: 'checkbox' },
+    ],
+  },
+  faqs: {
+    endpoint: '/api/admin/faqs',
+    cols: [
+      ['id', '#'],
+      ['question_zh', 'admin.faq.q_zh'],
+      ['question_en', 'admin.faq.q_en'],
+      ['sort_order', 'admin.cfg.sort'],
+      ['enabled', 'admin.cfg.enabled'],
+    ],
+    fields: [
+      { k: 'question_zh', label: 'admin.faq.q_zh',    type: 'text', required: true },
+      { k: 'question_en', label: 'admin.faq.q_en',    type: 'text', required: true },
+      { k: 'answer_zh',   label: 'admin.faq.a_zh',    type: 'textarea', required: true },
+      { k: 'answer_en',   label: 'admin.faq.a_en',    type: 'textarea', required: true },
+      { k: 'sort_order',  label: 'admin.cfg.sort',    type: 'number', step: 1 },
+      { k: 'enabled',     label: 'admin.cfg.enabled', type: 'checkbox' },
+    ],
+  },
+};
 
 async function viewAdmin(el) {
   const a = R.auth();
@@ -80,14 +184,37 @@ async function viewAdmin(el) {
         await renderSettingsTab(host);
       } else if (s.tab === 'kyc') {
         const rows = await R.api('/api/admin/kyc');
+        const tk = R.auth().token;
+        // 高级 KYC 已上传图片的行，点击缩略图可大图查看
+        const imgCell = (rel) => rel
+          ? `<a href="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" target="_blank">
+               <img src="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" alt=""
+                 style="height:48px;border-radius:4px;border:1px solid var(--border)"/></a>` : '—';
         host.innerHTML = table(
-          [t('admin.col.user'), t('admin.col.name'), t('admin.col.id'), t('admin.col.country'), t('admin.col.status'), t('admin.col.action')],
+          [t('admin.col.user'), t('admin.col.name'), t('admin.col.id'),
+           t('admin.kyc.level'), t('admin.kyc.basic'),
+           t('kyc.id_front'), t('kyc.id_back'), t('kyc.holding'),
+           t('admin.kyc.advanced'), t('admin.col.action')],
           rows.map(k => `<tr><td>${k.username}</td><td>${k.real_name || '—'}</td>
-            <td>${k.id_number || '—'}</td><td>${k.country || '—'}</td>
+            <td>${k.id_number || '—'}</td>
+            <td>${'L' + (k.kyc_level || 0)}</td>
             <td><span class="badge ${k.status}">${t('status.' + k.status)}</span></td>
-            <td>${k.status === 'reviewing' ? `
-              <button class="btn small ok" data-act="approve" data-uid="${k.user_id}" data-kind="kyc">${t('common.approve')}</button>
-              <button class="btn small danger" data-act="reject" data-uid="${k.user_id}" data-kind="kyc">${t('common.reject')}</button>` : '—'}</td></tr>`));
+            <td>${imgCell(k.id_front_path)}</td>
+            <td>${imgCell(k.id_back_path)}</td>
+            <td>${imgCell(k.holding_path)}</td>
+            <td>${k.advanced_status
+              ? `<span class="badge ${k.advanced_status}">${t('status.' + k.advanced_status)}</span>`
+              : '—'}</td>
+            <td>${[
+              k.status === 'reviewing'
+                ? `<button class="btn small ok" data-act="approve" data-uid="${k.user_id}" data-kind="kyc" data-stage="basic">${t('admin.kyc.approve_basic')}</button>
+                   <button class="btn small danger" data-act="reject" data-uid="${k.user_id}" data-kind="kyc" data-stage="basic">${t('admin.kyc.reject_basic')}</button>`
+                : '',
+              k.advanced_status === 'reviewing'
+                ? `<button class="btn small ok" data-act="approve" data-uid="${k.user_id}" data-kind="kyc" data-stage="advanced">${t('admin.kyc.approve_advanced')}</button>
+                   <button class="btn small danger" data-act="reject" data-uid="${k.user_id}" data-kind="kyc" data-stage="advanced">${t('admin.kyc.reject_advanced')}</button>`
+                : '',
+            ].filter(Boolean).join(' ') || '—'}</td></tr>`));
       } else if (s.tab === 'deposits' || s.tab === 'withdraws') {
         const rows = await R.api('/api/admin/' + s.tab);
         host.innerHTML = table(
@@ -108,13 +235,20 @@ async function viewAdmin(el) {
           rows.map(m => `<tr><td>${m.username || '—'}</td><td>${m.name || '—'}</td>
             <td>${m.email || '—'}</td><td style="max-width:360px;white-space:normal">${m.content}</td>
             <td>${R.fmtTs(m.created_at)}</td></tr>`));
+      } else if (s.tab === 'loan_apps') {
+        await renderLoanAppsTab(host);
+      } else if (CFG_ENTITIES[s.tab]) {
+        await renderCfgTab(host, s.tab);
       }
       host.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', async () => {
         const { act, kind, id, uid } = b.dataset;
         if (!confirm(t('admin.confirm'))) return;
         try {
-          if (kind === 'kyc') await R.api('/api/admin/kyc/' + uid, { method: 'POST', body: { action: act } });
-          else                await R.api(`/api/admin/${kind}/${id}`, { method: 'POST', body: { action: act } });
+          if (kind === 'kyc') {
+            const stage = b.dataset.stage || 'basic';
+            await R.api('/api/admin/kyc/' + uid, { method: 'POST',
+              body: { action: act, stage } });
+          } else                await R.api(`/api/admin/${kind}/${id}`, { method: 'POST', body: { action: act } });
           R.toast('OK', 'ok'); loadOverview(); loadTab();
         } catch (e) { R.toast(e.message, 'error'); }
       }));
@@ -148,8 +282,15 @@ async function viewAdmin(el) {
           </div>
           <div class="card">
             <h4>${t('admin.adjust_cash')}</h4>
-            <p><b>${t('admin.col.cash')}:</b> $${R.fmt(a.cash)}</p>
+            <p><b>${t('assets.spot_cash')}:</b> $${R.fmt(a.spot_cash || 0)}
+               &nbsp; <b>${t('assets.option_cash')}:</b> $${R.fmt(a.option_cash || 0)}
+               &nbsp; <b>${t('admin.col.cash')}:</b> $${R.fmt(a.cash || 0)}</p>
             <form id="uf-cash" class="space-y">
+              <div class="field"><label>${t('admin.wallet') || 'Wallet'}</label>
+                <select name="wallet">
+                  <option value="spot">${t('assets.spot_cash')}</option>
+                  <option value="option">${t('assets.option_cash')}</option>
+                </select></div>
               <div class="field"><label>${t('admin.mode')}</label>
                 <select name="mode">
                   <option value="adjust">${t('admin.mode.adjust')}</option>
@@ -165,6 +306,23 @@ async function viewAdmin(el) {
               <div class="field"><label>${t('trading.col.qty')}</label><input name="qty" type="number" step="0.0001" required/></div>
               <div class="field"><label>${t('admin.avg_price')}</label><input name="avg_price" type="number" step="0.01" required/></div>
               <button class="btn primary" type="submit">${t('common.apply')}</button>
+            </form>
+          </div>
+          <div class="card" style="grid-column: 1/-1">
+            <h4>${t('admin.force_outcome')}</h4>
+            <form id="uf-force" class="space-y">
+              <div class="field">
+                ${[
+                  ['none', 'admin.force.none'],
+                  ['next_win', 'admin.force.next_win'],
+                  ['next_lose', 'admin.force.next_lose'],
+                  ['always_win', 'admin.force.always_win'],
+                  ['always_lose', 'admin.force.always_lose'],
+                ].map(([v, k]) => `<label style="display:inline-flex;align-items:center;gap:6px;margin-right:14px">
+                  <input type="radio" name="mode" value="${v}" ${(u.force_outcome || 'none') === v ? 'checked' : ''}/> ${t(k)}</label>`).join('')}
+              </div>
+              <small style="color:var(--text-500)">${t('admin.force_hint')}</small>
+              <div><button class="btn primary" type="submit">${t('common.apply')}</button></div>
             </form>
           </div>
           <div class="card" style="grid-column: 1/-1">
@@ -204,7 +362,8 @@ async function viewAdmin(el) {
       e.preventDefault();
       const fd = new FormData(e.target);
       try { await R.api(`/api/admin/users/${uid}/cash`, { method: 'POST',
-        body: { mode: fd.get('mode'), amount: Number(fd.get('amount')) } });
+        body: { wallet: fd.get('wallet'), mode: fd.get('mode'),
+                amount: Number(fd.get('amount')) } });
         R.toast('OK', 'ok'); close(); loadTab(); loadOverview(); }
       catch (err) { R.toast(err.message, 'error'); }
     });
@@ -217,6 +376,138 @@ async function viewAdmin(el) {
         R.toast('OK', 'ok'); close(); loadTab(); }
       catch (err) { R.toast(err.message, 'error'); }
     });
+    host.querySelector('#uf-force').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try { await R.api(`/api/admin/users/${uid}/force-outcome`, { method: 'POST',
+        body: { mode: fd.get('mode') } });
+        R.toast('OK', 'ok'); close(); loadTab(); }
+      catch (err) { R.toast(err.message, 'error'); }
+    });
+  }
+
+  /* ---------------- 通用可配置实体 CRUD ---------------- */
+  async function renderCfgTab(host, key) {
+    const conf = CFG_ENTITIES[key];
+    let rows = [];
+    try { rows = await R.api(conf.endpoint); }
+    catch (e) { host.innerHTML = `<div class="msg">${e.message}</div>`; return; }
+    const headers = conf.cols.map(([, lk]) => lk === '#' ? '#' : t(lk))
+      .concat([t('admin.col.action')]);
+    host.innerHTML = `
+      <div style="margin-bottom:12px"><button class="btn primary" id="cfg-new">+ ${t('admin.cfg.add')}</button></div>
+      ${table(headers, rows.map(r => {
+        const tds = conf.cols.map(([k]) => {
+          const v = r[k];
+          if (k === 'enabled') return `<td>${v ? '✅' : '—'}</td>`;
+          if (typeof v === 'number') return `<td>${R.fmt(v, k.includes('rate') ? 4 : 2)}</td>`;
+          return `<td>${escapeHtml(v == null ? '—' : String(v))}</td>`;
+        }).join('');
+        return `<tr>${tds}<td>
+          <button class="btn small" data-cfg-edit="${r.id}">${t('admin.edit')}</button>
+          <button class="btn small danger" data-cfg-del="${r.id}">${t('admin.delete')}</button>
+        </td></tr>`;
+      }))}`;
+    host.querySelector('#cfg-new').addEventListener('click', () => openCfgEditor(key, null));
+    host.querySelectorAll('button[data-cfg-edit]').forEach(b =>
+      b.addEventListener('click', () => openCfgEditor(key,
+        rows.find(x => x.id === Number(b.dataset.cfgEdit)))));
+    host.querySelectorAll('button[data-cfg-del]').forEach(b =>
+      b.addEventListener('click', async () => {
+        if (!confirm(t('admin.confirm'))) return;
+        try { await R.api(`${conf.endpoint}/${b.dataset.cfgDel}`, { method: 'DELETE' });
+          R.toast('OK', 'ok'); loadTab(); }
+        catch (e) { R.toast(e.message, 'error'); }
+      }));
+  }
+
+  function openCfgEditor(key, row) {
+    const conf = CFG_ENTITIES[key];
+    const isEdit = !!row;
+    const m = document.createElement('div');
+    m.className = 'modal-back';
+    const fieldHtml = conf.fields.map(f => {
+      const v = row && row[f.k] != null ? row[f.k] : '';
+      if (f.type === 'textarea') {
+        return `<div class="field"><label>${t(f.label)}</label>
+          <textarea name="${f.k}" rows="3"${f.required ? ' required' : ''}>${escapeHtml(String(v))}</textarea></div>`;
+      }
+      if (f.type === 'checkbox') {
+        const checked = (row ? !!row[f.k] : true) ? ' checked' : '';
+        return `<div class="field"><label><input type="checkbox" name="${f.k}"${checked}/> ${t(f.label)}</label></div>`;
+      }
+      const step = f.step != null ? ` step="${f.step}"` : '';
+      const req = f.required ? ' required' : '';
+      return `<div class="field"><label>${t(f.label)}</label>
+        <input name="${f.k}" type="${f.type}"${step}${req} value="${escapeHtml(String(v))}"/></div>`;
+    }).join('');
+    m.innerHTML = `
+      <div class="modal">
+        <div class="modal-head"><h3>${isEdit ? t('admin.edit') : t('admin.cfg.add')}</h3>
+          <button class="x" data-close>×</button></div>
+        <div class="modal-body">
+          <form id="cfg-form" class="space-y">${fieldHtml}
+            <button class="btn primary" type="submit">${t('profile.save')}</button>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.querySelector('[data-close]').addEventListener('click', close);
+    m.addEventListener('click', (e) => { if (e.target === m) close(); });
+    m.querySelector('#cfg-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = {};
+      for (const f of conf.fields) {
+        if (f.type === 'checkbox') {
+          body[f.k] = e.target[f.k].checked ? 1 : 0;
+        } else if (f.type === 'number') {
+          const raw = fd.get(f.k);
+          body[f.k] = raw === '' || raw == null ? null : Number(raw);
+        } else {
+          const raw = fd.get(f.k);
+          body[f.k] = raw == null ? null : String(raw);
+        }
+      }
+      try {
+        if (isEdit) await R.api(`${conf.endpoint}/${row.id}`, { method: 'PUT', body });
+        else        await R.api(conf.endpoint,                { method: 'POST', body });
+        R.toast('OK', 'ok'); close(); loadTab();
+      } catch (err) { R.toast(err.message, 'error'); }
+    });
+  }
+
+  /* ---------------- 贷款申请审核 ---------------- */
+  async function renderLoanAppsTab(host) {
+    let rows = [];
+    try { rows = await R.api('/api/admin/loan/applications'); }
+    catch (e) { host.innerHTML = `<div class="msg">${e.message}</div>`; return; }
+    host.innerHTML = table(
+      [t('admin.loan.applicant'), t('admin.loan.product'), t('admin.col.amount'),
+       t('admin.loan.term_days'), t('admin.loan.total_repay'), t('admin.col.status'),
+       t('admin.loan.applied_at'), t('admin.col.action')],
+      rows.map(a => `<tr>
+        <td>${escapeHtml(a.username)} <small>#${a.user_id}</small></td>
+        <td>${escapeHtml(a.name_zh || ('#' + a.product_id))}</td>
+        <td>$${R.fmt(a.amount)}</td>
+        <td>${a.term_days}</td>
+        <td>$${R.fmt(a.total_repay)}</td>
+        <td><span class="badge ${a.status}">${t('status.' + a.status)}</span></td>
+        <td>${R.fmtTs(a.applied_at)}</td>
+        <td>${a.status === 'pending' ? `
+          <button class="btn small ok" data-loan-act="approve" data-id="${a.id}">${t('common.approve')}</button>
+          <button class="btn small danger" data-loan-act="reject" data-id="${a.id}">${t('common.reject')}</button>` : '—'}</td>
+      </tr>`));
+    host.querySelectorAll('button[data-loan-act]').forEach(b =>
+      b.addEventListener('click', async () => {
+        if (!confirm(t('admin.confirm'))) return;
+        try {
+          await R.api(`/api/admin/loan/applications/${b.dataset.id}`, {
+            method: 'POST', body: { action: b.dataset.loanAct } });
+          R.toast('OK', 'ok'); loadTab(); loadOverview();
+        } catch (e) { R.toast(e.message, 'error'); }
+      }));
   }
 
   /* ---------------- news tab ---------------- */

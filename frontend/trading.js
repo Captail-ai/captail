@@ -15,6 +15,8 @@ async function viewTrading(el, params) {
     pane: 'orders', orders: [], trades: [], positions: [], cash: 0,
     chart: null, view: 'candle', depthChart: null, extras: {},
     lastBar: null, mas: {},
+    mode: 'perp',
+    opt: { cfg: null, dir: 'up', dur: 0, amount: 0, active: [], history: [] },
   };
 
   const IVS = ['1m','5m','15m','30m','1h','4h','1D'];
@@ -82,34 +84,44 @@ async function viewTrading(el, params) {
           </div>
         </section>
         <aside class="dk-right">
-          <div class="side-tabs">
-            <button class="side buy active" data-side="buy">${t('trading.buy')}</button>
-            <button class="side sell" data-side="sell">${t('trading.sell')}</button>
+          <div class="mode-tabs">
+            <button class="md active" data-mode="perp">${t('trading.mode.perp')}</button>
+            <button class="md" data-mode="opt">${t('trading.mode.opt')}</button>
           </div>
-          <div class="type-tabs">
-            <button class="ty active" data-type="limit">${t('trading.limit')}</button>
-            <button class="ty" data-type="market">${t('trading.market')}</button>
-          </div>
-          <form id="order-form">
-            <div class="field"><label>${t('trading.price')}</label>
-              <input name="price" type="number" step="0.01" min="0"/></div>
-            <div class="field"><label>${t('trading.qty')}</label>
-              <input name="qty" type="number" step="0.0001" min="0" required/></div>
-            <div class="rows">
-              <div><span>${t('trading.ref_price')}</span><b id="ref-price">—</b></div>
-              <div><span>${t('trading.ref_cash')}</span><b id="ref-cash">—</b></div>
-              <div><span>${t('trading.ref_pos')}</span><b id="ref-pos">—</b></div>
-              <div><span>${t('trading.ref_notional')}</span><b id="ref-notional">—</b></div>
+          <div id="perp-pane">
+            <div class="side-tabs">
+              <button class="side buy active" data-side="buy">${t('trading.buy')}</button>
+              <button class="side sell" data-side="sell">${t('trading.sell')}</button>
             </div>
-            <button type="submit" id="submit-order" class="btn buy big block">${t('trading.buy')}</button>
-            <div id="order-msg" class="msg"></div>
-          </form>
+            <div class="type-tabs">
+              <button class="ty active" data-type="limit">${t('trading.limit')}</button>
+              <button class="ty" data-type="market">${t('trading.market')}</button>
+            </div>
+            <form id="order-form">
+              <div class="field"><label>${t('trading.price')}</label>
+                <input name="price" type="number" step="0.01" min="0"/></div>
+              <div class="field"><label>${t('trading.qty')}</label>
+                <input name="qty" type="number" step="0.0001" min="0" required/></div>
+              <div class="rows">
+                <div><span>${t('trading.ref_price')}</span><b id="ref-price">—</b></div>
+                <div><span>${t('trading.ref_cash')}</span><b id="ref-cash">—</b></div>
+                <div><span>${t('trading.ref_pos')}</span><b id="ref-pos">—</b></div>
+                <div><span>${t('trading.ref_notional')}</span><b id="ref-notional">—</b></div>
+              </div>
+              <button type="submit" id="submit-order" class="btn buy big block">${t('trading.buy')}</button>
+              <div id="order-msg" class="msg"></div>
+            </form>
+            <a id="spot-link" class="spot-link">${t('trading.spot.link')}</a>
+          </div>
+          <div id="opt-pane" class="hidden"></div>
         </aside>
         <div class="dk-tabbar">
           <button class="tb active" data-pane="orders">${t('trading.current_orders')}</button>
           <button class="tb" data-pane="history">${t('trading.order_history')}</button>
           <button class="tb" data-pane="trades">${t('trading.trades')}</button>
           <button class="tb" data-pane="positions">${t('trading.positions')}</button>
+          <button class="tb" data-pane="opt_active">${t('trading.opt_active')}</button>
+          <button class="tb" data-pane="opt_history">${t('trading.opt_history')}</button>
         </div>
         <div class="dk-tables" id="dk-tables"></div>
       </div>
@@ -453,6 +465,32 @@ async function viewTrading(el, params) {
         <td>${R.fmt(p.avg_price)}</td><td>${R.fmt(p.last)}</td>
         <td>${R.fmt(p.market_value)}</td>
         <td class="${p.pnl >= 0 ? 'buy' : 'sell'}">${R.fmt(p.pnl)}</td></tr>`));
+    } else if (s.pane === 'opt_active') {
+      thead.push(`<tr><th>${t('sec.col.symbol')}</th><th>${t('sec.col.dir')}</th>
+        <th>${t('sec.col.duration')}</th><th>${t('sec.col.amount')}</th>
+        <th>${t('sec.col.open')}</th><th>${t('sec.col.countdown')}</th></tr>`);
+      s.opt.active.forEach(c => tbody.push(`<tr data-id="${c.id}" data-settle="${c.settle_at}">
+        <td>${c.symbol}</td>
+        <td class="${c.direction === 'up' ? 'buy' : 'sell'}">${c.direction === 'up' ? '▲ ' + t('sec.dir.up') : '▼ ' + t('sec.dir.down')}</td>
+        <td>${c.duration}s</td>
+        <td>$${R.fmt(c.amount)}</td>
+        <td>${R.fmt(c.open_price)}</td>
+        <td data-role="cd">—</td></tr>`));
+    } else if (s.pane === 'opt_history') {
+      thead.push(`<tr><th>${t('sec.col.time')}</th><th>${t('sec.col.symbol')}</th>
+        <th>${t('sec.col.dir')}</th><th>${t('sec.col.duration')}</th>
+        <th>${t('sec.col.amount')}</th><th>${t('sec.col.open')}</th>
+        <th>${t('sec.col.settle')}</th><th>${t('sec.col.status')}</th>
+        <th>${t('sec.col.pnl')}</th></tr>`);
+      s.opt.history.forEach(c => tbody.push(`<tr>
+        <td>${R.fmtTs(c.created_at)}</td><td>${c.symbol}</td>
+        <td class="${c.direction === 'up' ? 'buy' : 'sell'}">${c.direction === 'up' ? '▲' : '▼'}</td>
+        <td>${c.duration}s</td>
+        <td>$${R.fmt(c.amount)}</td>
+        <td>${R.fmt(c.open_price)}</td>
+        <td>${c.settle_price != null ? R.fmt(c.settle_price) : '—'}</td>
+        <td><span class="badge ${c.status === 'won' ? 'approved' : c.status === 'lost' ? 'rejected' : 'open'}">${t('sec.status.' + c.status)}</span></td>
+        <td class="${c.pnl > 0 ? 'up' : c.pnl < 0 ? 'down' : ''}">${c.pnl != null ? (c.pnl >= 0 ? '+' : '') + R.fmt(c.pnl) : '—'}</td></tr>`));
     }
     dom.tables.innerHTML = `<table><thead>${thead.join('')}</thead><tbody>${tbody.join('')}</tbody></table>`;
   }
@@ -471,10 +509,144 @@ async function viewTrading(el, params) {
       const [acc, orders, trades] = await Promise.all([
         R.api('/api/account'), R.api('/api/orders'), R.api('/api/trades'),
       ]);
-      s.cash = acc.cash; s.positions = acc.positions;
+      // 现货撮合从期权钱包扣款，故交易页展示 option_cash
+      s.cash = (acc.option_cash != null) ? acc.option_cash : acc.cash;
+      s.positions = acc.positions;
       s.orders = orders; s.trades = trades;
       updateFormRefs(); renderTable();
     } catch (_) {}
+  }
+
+  // ===== 期权（秒级合约）=====
+  async function loadOptCfg() {
+    if (s.opt.cfg) return s.opt.cfg;
+    try {
+      s.opt.cfg = await R.api('/api/seconds/config', { auth: false });
+      const ds = s.opt.cfg.durations || [];
+      s.opt.dur = (ds[1] && ds[1].duration) || (ds[0] && ds[0].duration) || 60;
+      s.opt.amount = Math.max(s.opt.cfg.min_amount || 10, 100);
+    } catch (_) { s.opt.cfg = { durations: [], min_amount: 10, max_amount: 50000 }; }
+    return s.opt.cfg;
+  }
+  function payoutOf(d) {
+    const it = (s.opt.cfg.durations || []).find(x => x.duration === Number(d));
+    return it ? it.payout_rate : 0;
+  }
+  function renderOptPane() {
+    const pane = $('#opt-pane');
+    if (!pane) return;
+    const cfg = s.opt.cfg || { durations: [], min_amount: 10, max_amount: 50000 };
+    const price = (live.ticker[s.symbol] || {}).price;
+    pane.innerHTML = `
+      <form id="opt-form">
+        <div class="field"><label>${t('sec.duration')}</label>
+          <div class="tabs-pill" id="opt-dur">
+            ${cfg.durations.map(d => `<button type="button" data-d="${d.duration}"
+              class="${d.duration === s.opt.dur ? 'active' : ''}">${d.duration}s · +${(d.payout_rate*100).toFixed(0)}%</button>`).join('')}
+          </div></div>
+        <div class="field"><label>${t('sec.direction')}</label>
+          <div class="tabs-pill" id="opt-dir">
+            <button type="button" data-v="up"   class="${s.opt.dir === 'up' ? 'active' : ''}">▲ ${t('sec.dir.up')}</button>
+            <button type="button" data-v="down" class="${s.opt.dir === 'down' ? 'active' : ''}">▼ ${t('sec.dir.down')}</button>
+          </div></div>
+        <div class="field"><label>${t('sec.amount')}</label>
+          <input name="amount" type="number" min="${cfg.min_amount}" max="${cfg.max_amount}"
+            step="1" value="${s.opt.amount}" required/>
+          <small>${t('sec.min_max').replace('{min}', cfg.min_amount).replace('{max}', cfg.max_amount)}</small>
+        </div>
+        <div class="kv">
+          <label>${t('sec.balance')}</label><b id="opt-balance">$${R.fmt(s.cash)}</b>
+          <label>${t('sec.open_price')}</label><b id="opt-open">${R.fmt(price)}</b>
+          <label>${t('sec.payout')}</label><b id="opt-payout">+${(payoutOf(s.opt.dur) * 100).toFixed(0)}%</b>
+        </div>
+        <button class="btn primary big block" type="submit">${t('sec.place')}</button>
+        <div class="msg" id="opt-msg"></div>
+        <small style="color:var(--dk-muted);display:block;margin-top:6px">${t('sec.tip')}</small>
+      </form>
+      <a id="spot-link-opt" class="spot-link">${t('trading.spot.link')}</a>`;
+    bindOptPane();
+  }
+  function bindOptPane() {
+    const pane = $('#opt-pane');
+    pane.querySelectorAll('#opt-dur button').forEach(b => b.addEventListener('click', () => {
+      s.opt.dur = Number(b.dataset.d); renderOptPane();
+    }));
+    pane.querySelectorAll('#opt-dir button').forEach(b => b.addEventListener('click', () => {
+      s.opt.dir = b.dataset.v; renderOptPane();
+    }));
+    pane.querySelector('input[name=amount]').addEventListener('change', (e) => {
+      s.opt.amount = Number(e.target.value) || 0;
+    });
+    pane.querySelector('#opt-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!R.auth().token) { R.navigate('/login'); return; }
+      const msg = pane.querySelector('#opt-msg');
+      msg.className = 'msg'; msg.textContent = t('common.loading');
+      try {
+        await R.api('/api/seconds/orders', { method: 'POST', body: {
+          symbol: s.symbol, direction: s.opt.dir,
+          amount: s.opt.amount, duration: s.opt.dur } });
+        msg.className = 'msg ok'; msg.textContent = t('sec.placed');
+        R.toast(t('sec.placed'), 'ok');
+        await refreshOpt(); refreshAll();
+      } catch (err) {
+        msg.className = 'msg'; msg.textContent = err.message;
+        R.toast(err.message, 'error');
+      }
+    });
+    pane.querySelector('#spot-link-opt').addEventListener('click', openSpotModal);
+  }
+  async function refreshOpt() {
+    if (!R.auth().token) return;
+    try {
+      const [active, history] = await Promise.all([
+        R.api('/api/seconds/orders/active'),
+        R.api('/api/seconds/orders?limit=50'),
+      ]);
+      s.opt.active = active;
+      s.opt.history = history.filter(c => c.status !== 'open');
+      if (s.pane === 'opt_active' || s.pane === 'opt_history') renderTable();
+    } catch (_) {}
+  }
+
+  // ===== 现货购买 modal =====
+  function openSpotModal() {
+    if (!R.auth().token) { R.navigate('/login'); return; }
+    const back = document.createElement('div');
+    back.className = 'modal-backdrop';
+    back.innerHTML = `<div class="modal-card">
+      <h3>${t('trading.spot.link').replace(' →','')}</h3>
+      <form id="spot-form" class="space-y">
+        <div class="field"><label>${t('trading.symbol')}</label>
+          <select name="symbol">${live.symbols.map(sy =>
+            `<option value="${sy.symbol}" ${sy.symbol === s.symbol ? 'selected' : ''}>${sy.symbol} · ${sy.name}</option>`).join('')}</select></div>
+        <div class="field"><label>${t('trading.qty')}</label>
+          <input name="qty" type="number" step="0.0001" min="0" required/></div>
+        <div class="msg" id="spot-msg"></div>
+        <div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+          <button type="button" class="btn ghost" data-act="cancel">${t('common.cancel') || 'Cancel'}</button>
+          <button type="submit" class="btn primary">${t('trading.buy')}</button>
+        </div>
+      </form></div>`;
+    document.body.appendChild(back);
+    const close = () => back.remove();
+    back.addEventListener('click', (e) => { if (e.target === back) close(); });
+    back.querySelector('[data-act=cancel]').addEventListener('click', close);
+    back.querySelector('#spot-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const msg = back.querySelector('#spot-msg');
+      msg.className = 'msg'; msg.textContent = t('common.loading');
+      try {
+        const o = await R.api('/api/orders', { method: 'POST', body: {
+          symbol: fd.get('symbol'), side: 'buy', type: 'market',
+          qty: Number(fd.get('qty')) } });
+        R.toast(`${t('trading.buy')} ${o.symbol} #${o.id}`, 'ok');
+        close(); refreshAll();
+      } catch (err) {
+        msg.className = 'msg'; msg.textContent = err.message;
+      }
+    });
   }
 
   async function switchSymbol(sym) {
@@ -619,6 +791,30 @@ async function viewTrading(el, params) {
     }
   });
 
+  // 期权/永续 二级 tab 切换
+  const mdBtns = $$('.mode-tabs .md');
+  const perpPane = $('#perp-pane'), optPane = $('#opt-pane');
+  mdBtns.forEach(b => b.addEventListener('click', async () => {
+    s.mode = b.dataset.mode;
+    setActive(mdBtns, x => x === b);
+    perpPane.classList.toggle('hidden', s.mode !== 'perp');
+    optPane.classList.toggle('hidden', s.mode !== 'opt');
+    if (s.mode === 'opt') {
+      await loadOptCfg();
+      renderOptPane();
+      refreshOpt();
+      // 默认切到期权持仓 pane
+      s.pane = 'opt_active';
+      setActive(paneBtns, x => x.dataset.pane === 'opt_active');
+      renderTable();
+    } else {
+      s.pane = 'orders';
+      setActive(paneBtns, x => x.dataset.pane === 'orders');
+      renderTable();
+    }
+  }));
+  $('#spot-link').addEventListener('click', openSpotModal);
+
   // 按帧合并密集 WS tick；顶部价/列表最多 60 fps 更新一次
   const renderTick = R.rafThrottle(() => { updateListPrices(); updateHead(); });
   const liveFn = (m) => {
@@ -626,15 +822,36 @@ async function viewTrading(el, params) {
       renderTick();
       const cur = m.data.find(tk => tk.symbol === s.symbol);
       if (cur) appendKline(cur.price);
+      // 期权 pane 的开仓参考价跟随 tick
+      if (s.mode === 'opt') {
+        const op = optPane.querySelector('#opt-open');
+        if (op && cur) op.textContent = R.fmt(cur.price);
+      }
     } else if (m.type === 'trade') {
       refreshAll();
     }
   };
   live.listeners.add(liveFn);
 
+  // 期权持仓倒计时：每秒刷新；到期项触发 refreshOpt 拉结算结果
+  const optCdTimer = setInterval(() => {
+    if (s.pane !== 'opt_active') return;
+    const now = Date.now();
+    let expired = false;
+    dom.tables.querySelectorAll('tr[data-settle]').forEach(tr => {
+      const left = Number(tr.dataset.settle) - now;
+      const cd = tr.querySelector('[data-role=cd]');
+      if (left <= 0) { if (cd) cd.textContent = '0s'; expired = true; }
+      else if (cd)   { cd.textContent = Math.ceil(left / 1000) + 's'; }
+    });
+    if (expired) refreshOpt();
+  }, 1000);
+
   // 初始化
   await switchSymbol(s.symbol);
   await refreshAll();
+  // 已登录用户预拉一次期权数据，避免切到 opt 时空白
+  if (R.auth().token) { loadOptCfg().then(refreshOpt); }
 
   return () => {
     window.removeEventListener('resize', onResize);
@@ -642,6 +859,7 @@ async function viewTrading(el, params) {
     clearInterval(depthTimer);
     clearInterval(extrasTimer);
     clearInterval(countdownTimer);
+    clearInterval(optCdTimer);
     if (s.chart) { try { s.chart.dispose(); } catch (_) {} }
     if (s.depthChart) { try { s.depthChart.dispose(); } catch (_) {} }
   };

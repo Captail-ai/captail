@@ -1,14 +1,19 @@
 const db = require('./db');
 const market = require('./market');
 
-const FEE_RATE = 0.0005; // 0.05%
+// 双钱包改造后交易免手续费（提现 1% 在 server.js 单独处理）
+const FEE_RATE = 0;
 
 const tradeListeners = new Set();
 function onTrade(fn) { tradeListeners.add(fn); return () => tradeListeners.delete(fn); }
 function emitTrade(t) { for (const fn of tradeListeners) { try { fn(t); } catch (_) {} } }
 
+// 返回完整的钱包结构，便于上层既能读到现货 / 期权 / 总额
 function getAccount(uid) {
-  return db.prepare('SELECT cash FROM accounts WHERE user_id=?').get(uid);
+  const row = db.prepare('SELECT spot_cash, option_cash FROM accounts WHERE user_id=?').get(uid);
+  if (!row) return null;
+  return { spot_cash: row.spot_cash, option_cash: row.option_cash,
+           cash: row.spot_cash + row.option_cash };
 }
 
 function getPosition(uid, symbol) {
@@ -25,8 +30,9 @@ function applyFill(order, price, qty) {
     if (order.side === 'buy') {
       const acc = getAccount(order.user_id);
       const cost = notional + fee;
-      if (acc.cash < cost - 1e-9) throw new Error('资金不足');
-      db.prepare('UPDATE accounts SET cash = cash - ? WHERE user_id=?').run(cost, order.user_id);
+      // 现货撮合从 option 钱包扣款 / 入款（产品规则：交易在期权钱包内进行）
+      if (!acc || acc.option_cash < cost - 1e-9) throw new Error('期权钱包资金不足');
+      db.prepare('UPDATE accounts SET option_cash = option_cash - ? WHERE user_id=?').run(cost, order.user_id);
       const pos = getPosition(order.user_id, order.symbol);
       const newQty = pos.qty + qty;
       const newAvg = newQty > 0 ? (pos.qty * pos.avg_price + notional) / newQty : 0;
@@ -37,7 +43,8 @@ function applyFill(order, price, qty) {
     } else {
       const pos = getPosition(order.user_id, order.symbol);
       if (pos.qty < qty - 1e-9) throw new Error('持仓不足');
-      db.prepare('UPDATE accounts SET cash = cash + ? WHERE user_id=?').run(notional - fee, order.user_id);
+      db.prepare('UPDATE accounts SET option_cash = option_cash + ? WHERE user_id=?')
+        .run(notional - fee, order.user_id);
       const newQty = pos.qty - qty;
       const newAvg = newQty > 1e-9 ? pos.avg_price : 0;
       db.prepare('UPDATE positions SET qty=?, avg_price=? WHERE user_id=? AND symbol=?')
@@ -79,12 +86,12 @@ function placeOrder(uid, { symbol, side, type, price, qty }) {
   const now = Date.now();
   const ref = market.getPrice(symbol);
 
-  // 买入前置校验：预估冻结资金是否充足
+  // 买入前置校验：现货撮合从期权钱包扣款
   if (side === 'buy') {
     const estPrice = type === 'market' ? ref : price;
     const need = estPrice * qty * (1 + FEE_RATE);
     const acc = getAccount(uid);
-    if (acc.cash < need - 1e-9) throw new Error('资金不足');
+    if (!acc || acc.option_cash < need - 1e-9) throw new Error('期权钱包资金不足');
   } else {
     const pos = getPosition(uid, symbol);
     if (pos.qty < qty - 1e-9) throw new Error('持仓不足');

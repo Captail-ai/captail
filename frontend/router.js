@@ -165,15 +165,17 @@ export function rafThrottle(fn) {
   };
 }
 
-export async function api(url, { method = 'GET', body, auth: needAuth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+export async function api(url, { method = 'GET', body, auth: needAuth = true, raw = false } = {}) {
+  const isForm = body instanceof FormData;
+  // FormData 走 multipart：浏览器自动设置带 boundary 的 Content-Type，不能手动指定
+  const headers = (isForm || raw) ? {} : { 'Content-Type': 'application/json' };
   if (needAuth) {
     const tk = auth().token;
     if (tk) headers.Authorization = 'Bearer ' + tk;
   }
   const res = await fetch(url, {
     method, headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: isForm ? body : (body ? JSON.stringify(body) : undefined),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

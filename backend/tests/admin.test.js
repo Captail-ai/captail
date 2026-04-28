@@ -64,6 +64,9 @@ describe('user detail + edits', () => {
     const r = await request(app).get('/api/admin/users/' + userId).set(auth(adminToken));
     expect(r.status).toBe(200);
     expect(r.body.user.id).toBe(userId);
+    // 双钱包改造：注册赠金 100000 USD 进入期权钱包
+    expect(r.body.account.spot_cash).toBe(0);
+    expect(r.body.account.option_cash).toBe(100000);
     expect(r.body.account.cash).toBe(100000);
     expect(Array.isArray(r.body.positions)).toBe(true);
     expect(Array.isArray(r.body.orders)).toBe(true);
@@ -105,26 +108,40 @@ describe('user detail + edits', () => {
 });
 
 describe('cash + positions', () => {
-  test('cash adjust (signed) and set both work', async () => {
+  test('cash adjust on option wallet works (signed)', async () => {
     const a = await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
-      .send({ mode: 'adjust', amount: -5000 });
+      .send({ wallet: 'option', mode: 'adjust', amount: -5000 });
     expect(a.status).toBe(200);
+    // 注册赠金 100000 在期权钱包，扣 5000 → 期权 95000；现货仍为 0
+    expect(a.body.option_cash).toBe(95000);
+    expect(a.body.spot_cash).toBe(0);
     expect(a.body.cash).toBe(95000);
+  });
 
+  test('cash set on spot wallet works', async () => {
     const b = await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
-      .send({ mode: 'set', amount: 250000 });
-    expect(b.body.cash).toBe(250000);
+      .send({ wallet: 'spot', mode: 'set', amount: 250000 });
+    expect(b.body.spot_cash).toBe(250000);
+    // 期权钱包不受影响
+    expect(b.body.option_cash).toBe(95000);
+    expect(b.body.cash).toBe(345000);
   });
 
   test('set with negative amount rejected', async () => {
     const r = await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
-      .send({ mode: 'set', amount: -1 });
+      .send({ wallet: 'spot', mode: 'set', amount: -1 });
     expect(r.status).toBe(400);
   });
 
   test('non-numeric amount rejected', async () => {
     const r = await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
-      .send({ mode: 'adjust', amount: 'abc' });
+      .send({ wallet: 'spot', mode: 'adjust', amount: 'abc' });
+    expect(r.status).toBe(400);
+  });
+
+  test('invalid wallet rejected', async () => {
+    const r = await request(app).post(`/api/admin/users/${userId}/cash`).set(auth(adminToken))
+      .send({ wallet: 'savings', mode: 'set', amount: 100 });
     expect(r.status).toBe(400);
   });
 

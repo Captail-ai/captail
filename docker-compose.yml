@@ -20,6 +20,14 @@ services:
       LOGIN_LOCK_SECONDS: ${LOGIN_LOCK_SECONDS:-900}
       DEV_AUTO_VERIFY: ${DEV_AUTO_VERIFY:-0}
       MAIL_DEV_ECHO: ${MAIL_DEV_ECHO:-0}
+      MAIL_FROM: ${MAIL_FROM:-Captail <captailcn@outlook.com>}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-0}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
       - captail_data:/app/data
     networks: [captail]

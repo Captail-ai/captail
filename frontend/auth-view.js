@@ -162,7 +162,6 @@ function viewSignup(el) {
           </div>
           <button class="btn primary big block" type="submit">${t('auth.signup')}</button>
           <div class="msg" id="signup-msg"></div>
-          <p style="color:var(--text-500);font-size:12px;text-align:center;margin-top:8px">${t('auth.bonus')}</p>
           <div class="alt-link">
             ${t('auth.has_account')} <a href="#/login">${t('auth.login')}</a>
           </div>

@@ -12,14 +12,16 @@ const db = require('../db');
 const market = require('../market');
 const engine = require('../engine');
 
-const FEE = 0.0005;
+// 双钱包改造后：交易免手续费
+const FEE = 0;
 
 function mkUser(cash = 100000) {
   const info = db.prepare(
     'INSERT INTO users(username, password, created_at) VALUES (?,?,?)'
   ).run('u_' + Math.random().toString(36).slice(2, 8), 'x', Date.now());
   const uid = info.lastInsertRowid;
-  db.prepare('INSERT INTO accounts(user_id, cash) VALUES(?, ?)').run(uid, cash);
+  // 现货撮合从期权钱包扣款（产品规则），故初始资金注入 option_cash
+  db.prepare('INSERT INTO accounts(user_id, spot_cash, option_cash) VALUES(?, 0, ?)').run(uid, cash);
   return uid;
 }
 

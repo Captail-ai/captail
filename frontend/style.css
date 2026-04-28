@@ -357,6 +357,20 @@ section.alt { background: var(--bg-1); }
 .dk-right .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px;
   font-size: 12px; color: var(--dk-muted); margin: 4px 0 8px; }
 .dk-right .rows b { color: var(--dk-text); }
+.mode-tabs { display: flex; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--dk-line); }
+.mode-tabs .md { flex: 1; padding: 8px; background: transparent; border: 0;
+  color: var(--dk-muted); font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; }
+.mode-tabs .md.active { color: var(--gold-500); border-bottom-color: var(--gold-500); }
+.dk-right .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+  font-size: 12px; color: var(--dk-muted); margin: 4px 0; }
+.dk-right .kv b { color: var(--dk-text); }
+.dk-right .field small { color: var(--dk-muted); font-size: 11px; }
+.spot-link { display: inline-block; margin-top: 6px; color: var(--gold-500);
+  font-size: 12px; cursor: pointer; text-decoration: none; }
+.spot-link:hover { text-decoration: underline; }
+.dk-right .tabs-pill { background: var(--dk-panel); }
+.dk-right .tabs-pill button { color: var(--dk-muted); font-size: 12px; padding: 6px 10px; }
+.dk-right .tabs-pill button.active { background: var(--dk-panel-2); color: var(--dk-text); box-shadow: none; }
 
 /* ============ Toast / modal ============ */
 .toast-host { position: fixed; top: 80px; right: 24px; display: flex;
