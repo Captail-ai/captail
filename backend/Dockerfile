@@ -31,8 +31,10 @@ RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs nodejs
 COPY --from=builder --chown=nodejs:nodejs /app /app
 
 # 数据库目录（与 .env 中 DB_FILE 默认值对应）
-RUN mkdir -p /app/data && chown -R nodejs:nodejs /app/data
-VOLUME ["/app/data"]
+# 上传目录（KYC / 提现凭证图片）：预建子目录并交给 nodejs 用户，避免运行时 EACCES
+RUN mkdir -p /app/data /app/uploads/kyc /app/uploads/withdraw \
+ && chown -R nodejs:nodejs /app/data /app/uploads
+VOLUME ["/app/data", "/app/uploads"]
 
 USER nodejs
 

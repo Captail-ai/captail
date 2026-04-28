@@ -30,6 +30,7 @@ services:
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
       - captail_data:/app/data
+      - captail_uploads:/app/uploads
     networks: [captail]
     expose:
       - "3000"
@@ -46,6 +47,8 @@ services:
 
 volumes:
   captail_data:
+    driver: local
+  captail_uploads:
     driver: local
 
 networks:
