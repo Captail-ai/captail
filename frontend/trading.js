@@ -85,8 +85,8 @@ async function viewTrading(el, params) {
         </section>
         <aside class="dk-right">
           <div class="mode-tabs">
-            <button class="md active" data-mode="perp">${t('trading.mode.perp')}</button>
             <button class="md" data-mode="opt">${t('trading.mode.opt')}</button>
+            <button class="md active" data-mode="perp">${t('trading.mode.perp')}</button>
           </div>
           <div id="perp-pane">
             <div class="side-tabs">

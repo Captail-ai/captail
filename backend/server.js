@@ -786,12 +786,15 @@ app.post('/api/admin/users/:id', adminMiddleware, (req, res) => {
 
 app.post('/api/admin/users/:id/cash', adminMiddleware, (req, res) => {
   const uid = Number(req.params.id);
-  const { mode, amount, wallet } = req.body || {};
+  const { mode, amount, wallet, reason } = req.body || {};
   const amt = Number(amount);
   if (!isFinite(amt)) return res.status(400).json({ error: '金额非法' });
   // wallet 可选：'spot' / 'option'，缺省 'spot'。'both' 用于同步两个钱包（仅 set 模式有意义）
   const w = (wallet || 'spot').toString();
   if (!['spot', 'option'].includes(w)) return res.status(400).json({ error: 'wallet 非法' });
+  // reason 可选但若传则需 ≥2 字符；UI 强制必填
+  const rsn = reason == null ? '' : String(reason).trim();
+  if (rsn && rsn.length < 2) return res.status(400).json({ error: '原因至少 2 个字符' });
   const col = w === 'spot' ? 'spot_cash' : 'option_cash';
   const exists = db.prepare('SELECT user_id FROM accounts WHERE user_id=?').get(uid);
   if (!exists) db.prepare('INSERT INTO accounts(user_id, spot_cash, option_cash) VALUES(?, 0, 0)').run(uid);
@@ -805,11 +808,42 @@ app.post('/api/admin/users/:id/cash', adminMiddleware, (req, res) => {
   }
   const afterRow = db.prepare(`SELECT spot_cash, option_cash FROM accounts WHERE user_id=?`).get(uid);
   logAdminOp(req, 'cash.' + (mode === 'set' ? 'set' : 'adjust'), uid,
-    { wallet: w, mode: mode || 'adjust', amount: amt,
+    { wallet: w, mode: mode || 'adjust', amount: amt, reason: rsn || null,
       before: beforeRow, after: afterRow });
   // 返回兼容字段：cash = 总额；同时返回 spot/option 明细
   res.json({ cash: afterRow.spot_cash + afterRow.option_cash,
              spot_cash: afterRow.spot_cash, option_cash: afterRow.option_cash });
+});
+
+// 硬删除：连同 user 所有派生数据一并清掉；保留 admin_ops / security_events 作为审计留痕
+app.delete('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  const uid = Number(req.params.id);
+  const u = db.prepare('SELECT id, username, is_admin FROM users WHERE id=?').get(uid);
+  if (!u) return res.status(404).json({ error: '用户不存在' });
+  if (u.is_admin) return res.status(400).json({ error: '不能删除管理员账号' });
+  if (req.user && req.user.id === uid) return res.status(400).json({ error: '不能删除自己' });
+  const reason = String(req.body?.reason || '').trim();
+  if (reason.length < 2) return res.status(400).json({ error: '请填写删除原因（≥2 个字符）' });
+  const confirmName = String(req.body?.confirm_username || '').trim();
+  if (confirmName !== u.username) return res.status(400).json({ error: '请输入用户名以确认删除' });
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM trades WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM orders WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM positions WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM second_contracts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM deposit_requests WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM withdraw_requests WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM finance_subscriptions WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM loan_applications WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM email_verifications WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM service_messages WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM kyc WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM accounts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+  })();
+  logAdminOp(req, 'user.delete', uid, { username: u.username, reason });
+  res.json({ ok: true, deleted: u.username });
 });
 
 app.post('/api/admin/users/:id/positions', adminMiddleware, (req, res) => {

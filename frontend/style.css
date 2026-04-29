@@ -409,7 +409,9 @@ section.alt { background: var(--bg-1); }
   .market-table td, .market-table th { padding: 10px 12px; }
   .market-table .mini-chart { width: 90px; }
   .container, .wide { padding: 0 14px; }
+  /* 裸表格：自身横向滚动（兜底）；包裹层场景下交还给 .table-scroll */
   table.list { display: block; overflow-x: auto; }
+  .table-scroll table.list { display: table; min-width: 560px; overflow: visible; }
   table.list td, table.list th { white-space: nowrap; }
   .dk, .dk-layout { height: auto; min-height: 0; }
   .dk-layout { grid-template-columns: 1fr; grid-template-rows: none;
@@ -484,6 +486,10 @@ section.alt { background: var(--bg-1); }
 .badge.open { background: #eef3fb; color: var(--navy-600); }
 .badge.unsubmitted { background: var(--bg-2); color: var(--text-500); }
 
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border-radius: 10px; }
+.table-scroll::-webkit-scrollbar { height: 6px; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 table.list { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff;
   border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 table.list th { padding: 12px 14px; background: var(--bg-2); text-align: left;
@@ -606,6 +612,11 @@ table.list .sell { color: var(--down); font-weight: 600; }
 .btn.small { padding: 4px 10px; font-size: 12px; }
 .btn.ok { background: var(--up); color: #fff; border-color: var(--up); }
 .btn.danger { background: var(--down); color: #fff; border-color: var(--down); }
+
+/* admin: 用户列表行内按钮组 */
+table.list td.row-actions { white-space: nowrap; }
+table.list td.row-actions .btn { margin-right: 4px; margin-bottom: 2px; }
+table.list td.row-actions .btn:last-child { margin-right: 0; }
 
 /* admin: filter row above tables */
 .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;

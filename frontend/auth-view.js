@@ -110,9 +110,9 @@ function viewLogin(el) {
       });
       localStorage.setItem('token', r.token);
       localStorage.setItem('user', JSON.stringify(r.user));
-      const after = localStorage.getItem('after_login') || '#/';
+      // 登录后统一跳首页（忽略 after_login 记忆，按用户要求）
       localStorage.removeItem('after_login');
-      location.href = after;
+      location.href = '#/';
       location.reload();
     } catch (err) {
       if (err.data && err.data.needs_verification) {
@@ -196,7 +196,7 @@ function viewSignup(el) {
       }
       localStorage.setItem('token', r.token);
       localStorage.setItem('user', JSON.stringify(r.user));
-      location.href = '#/assets';
+      location.href = '#/';
       location.reload();
     } catch (err) {
       msg.className = 'msg'; msg.textContent = err.message;

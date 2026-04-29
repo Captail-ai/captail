@@ -164,6 +164,7 @@ async function viewAdmin(el) {
     try {
       if (s.tab === 'users') {
         const rows = await R.api('/api/admin/users');
+        const userMap = new Map(rows.map(u => [u.id, u]));
         host.innerHTML = table(
           [t('admin.col.user'), t('admin.col.email'), t('admin.col.phone'),
            t('admin.col.cash'), t('admin.col.kyc'), t('admin.col.created'), t('admin.col.action')],
@@ -171,9 +172,25 @@ async function viewAdmin(el) {
             <td>${u.email || '—'}</td><td>${u.phone || '—'}</td><td>$${R.fmt(u.cash || 0)}</td>
             <td><span class="badge ${u.kyc_status || 'unsubmitted'}">${t('status.' + (u.kyc_status || 'unsubmitted'))}</span></td>
             <td>${R.fmtTs(u.created_at)}</td>
-            <td><button class="btn small" data-detail="${u.id}">${t('admin.detail')}</button></td></tr>`));
-        host.querySelectorAll('button[data-detail]').forEach(b =>
-          b.addEventListener('click', () => openUserDetail(Number(b.dataset.detail))));
+            <td class="row-actions">
+              <button class="btn small"        data-uact="edit"     data-uid="${u.id}">${t('admin.edit')}</button>
+              <button class="btn small ok"     data-uact="deposit"  data-uid="${u.id}">${t('admin.btn.deposit')}</button>
+              <button class="btn small"        data-uact="withdraw" data-uid="${u.id}">${t('admin.btn.withdraw')}</button>
+              <button class="btn small"        data-uact="adjust"   data-uid="${u.id}">${t('admin.btn.adjust')}</button>
+              <button class="btn small ${u.is_banned ? 'ok' : ''}" data-uact="pause" data-uid="${u.id}">${u.is_banned ? t('admin.btn.resume') : t('admin.btn.pause')}</button>
+              <button class="btn small danger" data-uact="delete"   data-uid="${u.id}">${t('admin.delete')}</button>
+            </td></tr>`));
+        host.querySelectorAll('button[data-uact]').forEach(b => b.addEventListener('click', async () => {
+          const uid = Number(b.dataset.uid);
+          const u = userMap.get(uid);
+          const act = b.dataset.uact;
+          if (act === 'edit')        return openUserDetail(uid);
+          if (act === 'deposit')     return openWalletOp(uid, u, 'deposit');
+          if (act === 'withdraw')    return openWalletOp(uid, u, 'withdraw');
+          if (act === 'adjust')      return openWalletOp(uid, u, 'adjust');
+          if (act === 'pause')       return togglePause(uid, u);
+          if (act === 'delete')      return confirmDeleteUser(uid, u);
+        }));
       } else if (s.tab === 'news') {
         await renderNewsTab(host);
       } else if (s.tab === 'ops') {
@@ -255,6 +272,103 @@ async function viewAdmin(el) {
     } catch (e) { host.innerHTML = `<div class="msg">${e.message}</div>`; }
   }
 
+  /* ---------------- 极简钱包操作弹窗：充值 / 提现 / 上下分共用 ---------------- */
+  // op ∈ 'deposit' | 'withdraw' | 'adjust'
+  //   deposit  → spot   wallet, +amount
+  //   withdraw → spot   wallet, -amount
+  //   adjust   → option wallet, signed amount
+  async function openWalletOp(uid, u, op) {
+    const titleKey = op === 'deposit' ? 'admin.op.deposit'
+                   : op === 'withdraw' ? 'admin.op.withdraw' : 'admin.op.adjust';
+    const wallet = (op === 'adjust') ? 'option' : 'spot';
+    const signHint = op === 'withdraw' ? '−' : (op === 'deposit' ? '+' : '±');
+    const host = document.createElement('div');
+    host.className = 'modal-back';
+    host.innerHTML = `
+      <div class="modal">
+        <div class="modal-head"><h3>${t(titleKey)} · ${u.username} <small>#${u.id}</small></h3>
+          <button class="x" data-close>×</button></div>
+        <div class="modal-body">
+          <form id="wf" class="space-y">
+            <div class="field"><label>${t('admin.col.amount')} (${signHint})</label>
+              <input name="amount" type="number" step="0.01" min="${op === 'adjust' ? '' : '0'}" required autofocus/></div>
+            <div class="field"><label>${t('admin.reason')} *</label>
+              <input name="reason" type="text" maxlength="200" required
+                placeholder="${t('admin.reason.placeholder')}"/></div>
+            <button class="btn primary" type="submit">${t('common.apply')}</button>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(host);
+    const close = () => host.remove();
+    host.querySelector('[data-close]').addEventListener('click', close);
+    host.addEventListener('click', (e) => { if (e.target === host) close(); });
+    host.querySelector('#wf').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const reason = String(fd.get('reason') || '').trim();
+      if (reason.length < 2) { R.toast(t('admin.reason.required'), 'error'); return; }
+      let amt = Number(fd.get('amount'));
+      if (!isFinite(amt)) { R.toast(t('admin.col.amount'), 'error'); return; }
+      if (op === 'withdraw') amt = -Math.abs(amt);
+      if (op === 'deposit')  amt =  Math.abs(amt);
+      try {
+        await R.api(`/api/admin/users/${uid}/cash`, { method: 'POST',
+          body: { wallet, mode: 'adjust', amount: amt, reason } });
+        R.toast('OK', 'ok'); close(); loadTab(); loadOverview();
+      } catch (err) { R.toast(err.message, 'error'); }
+    });
+  }
+
+  async function togglePause(uid, u) {
+    const next = !u.is_banned;
+    if (!confirm(next ? t('admin.pause_confirm') : t('admin.resume_confirm'))) return;
+    try {
+      await R.api('/api/admin/users/' + uid, { method: 'POST',
+        body: { is_banned: next, is_admin: !!u.is_admin,
+                email: u.email || '', phone: u.phone || '', nickname: u.nickname || '' } });
+      R.toast('OK', 'ok'); loadTab();
+    } catch (e) { R.toast(e.message, 'error'); }
+  }
+
+  async function confirmDeleteUser(uid, u) {
+    const host = document.createElement('div');
+    host.className = 'modal-back';
+    host.innerHTML = `
+      <div class="modal">
+        <div class="modal-head"><h3>${t('admin.delete_title')} · ${u.username} <small>#${u.id}</small></h3>
+          <button class="x" data-close>×</button></div>
+        <div class="modal-body">
+          <p style="color:var(--danger,#c33)">${t('admin.delete_warn')}</p>
+          <form id="df" class="space-y">
+            <div class="field"><label>${t('admin.delete_confirm_label')} (<b>${u.username}</b>)</label>
+              <input name="confirm_username" type="text" autocomplete="off" required autofocus/></div>
+            <div class="field"><label>${t('admin.reason')} *</label>
+              <input name="reason" type="text" maxlength="200" required
+                placeholder="${t('admin.reason.placeholder')}"/></div>
+            <button class="btn danger" type="submit">${t('admin.delete')}</button>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(host);
+    const close = () => host.remove();
+    host.querySelector('[data-close]').addEventListener('click', close);
+    host.addEventListener('click', (e) => { if (e.target === host) close(); });
+    host.querySelector('#df').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const confirm_username = String(fd.get('confirm_username') || '').trim();
+      const reason = String(fd.get('reason') || '').trim();
+      if (confirm_username !== u.username) { R.toast(t('admin.delete_confirm_mismatch'), 'error'); return; }
+      if (reason.length < 2) { R.toast(t('admin.reason.required'), 'error'); return; }
+      try {
+        await R.api('/api/admin/users/' + uid, { method: 'DELETE',
+          body: { confirm_username, reason } });
+        R.toast('OK', 'ok'); close(); loadTab(); loadOverview();
+      } catch (err) { R.toast(err.message, 'error'); }
+    });
+  }
+
   /* ---------------- user detail modal ---------------- */
   async function openUserDetail(uid) {
     let d;
@@ -297,6 +411,9 @@ async function viewAdmin(el) {
                   <option value="set">${t('admin.mode.set')}</option>
                 </select></div>
               <div class="field"><label>${t('admin.col.amount')}</label><input name="amount" type="number" step="0.01" required/></div>
+              <div class="field"><label>${t('admin.reason')} *</label>
+                <input name="reason" type="text" maxlength="200" required
+                  placeholder="${t('admin.reason.placeholder')}"/></div>
               <button class="btn primary" type="submit">${t('common.apply')}</button>
             </form>
             <h4 style="margin-top:20px">${t('admin.adjust_position')}</h4>
@@ -361,9 +478,11 @@ async function viewAdmin(el) {
     host.querySelector('#uf-cash').addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
+      const reason = String(fd.get('reason') || '').trim();
+      if (reason.length < 2) { R.toast(t('admin.reason.required'), 'error'); return; }
       try { await R.api(`/api/admin/users/${uid}/cash`, { method: 'POST',
         body: { wallet: fd.get('wallet'), mode: fd.get('mode'),
-                amount: Number(fd.get('amount')) } });
+                amount: Number(fd.get('amount')), reason } });
         R.toast('OK', 'ok'); close(); loadTab(); loadOverview(); }
       catch (err) { R.toast(err.message, 'error'); }
     });

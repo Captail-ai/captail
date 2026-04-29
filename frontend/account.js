@@ -156,10 +156,10 @@ async function viewAssets(el) {
 
 function tbl(heads, rows) {
   if (!rows.length) return `<div class="card" style="text-align:center;color:var(--text-500)">${t('common.empty')}</div>`;
-  return `<table class="list">
+  return `<div class="table-scroll"><table class="list">
     <thead><tr>${heads.map(h => `<th>${h}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
 /* ================ DEPOSIT（金额 + 联系客服） ================ */
