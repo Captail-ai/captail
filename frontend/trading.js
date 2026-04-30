@@ -116,12 +116,12 @@ async function viewTrading(el, params) {
           <div id="opt-pane" class="hidden"></div>
         </aside>
         <div class="dk-tabbar">
+          <button class="tb" data-pane="opt_active">${t('trading.opt_active')}</button>
+          <button class="tb" data-pane="opt_history">${t('trading.opt_history')}</button>
           <button class="tb active" data-pane="orders">${t('trading.current_orders')}</button>
           <button class="tb" data-pane="history">${t('trading.order_history')}</button>
           <button class="tb" data-pane="trades">${t('trading.trades')}</button>
           <button class="tb" data-pane="positions">${t('trading.positions')}</button>
-          <button class="tb" data-pane="opt_active">${t('trading.opt_active')}</button>
-          <button class="tb" data-pane="opt_history">${t('trading.opt_history')}</button>
         </div>
         <div class="dk-tables" id="dk-tables"></div>
       </div>
@@ -545,9 +545,9 @@ async function viewTrading(el, params) {
               class="${d.duration === s.opt.dur ? 'active' : ''}">${d.duration}s · +${(d.payout_rate*100).toFixed(0)}%</button>`).join('')}
           </div></div>
         <div class="field"><label>${t('sec.direction')}</label>
-          <div class="tabs-pill" id="opt-dir">
-            <button type="button" data-v="up"   class="${s.opt.dir === 'up' ? 'active' : ''}">▲ ${t('sec.dir.up')}</button>
-            <button type="button" data-v="down" class="${s.opt.dir === 'down' ? 'active' : ''}">▼ ${t('sec.dir.down')}</button>
+          <div class="side-tabs" id="opt-dir">
+            <button type="button" data-v="up"   class="side buy ${s.opt.dir === 'up' ? 'active' : ''}">▲ ${t('sec.dir.up')}</button>
+            <button type="button" data-v="down" class="side sell ${s.opt.dir === 'down' ? 'active' : ''}">▼ ${t('sec.dir.down')}</button>
           </div></div>
         <div class="field"><label>${t('sec.amount')}</label>
           <input name="amount" type="number" min="${cfg.min_amount}" max="${cfg.max_amount}"
@@ -583,11 +583,26 @@ async function viewTrading(el, params) {
       const msg = pane.querySelector('#opt-msg');
       msg.className = 'msg'; msg.textContent = t('common.loading');
       try {
-        await R.api('/api/seconds/orders', { method: 'POST', body: {
+        const c = await R.api('/api/seconds/orders', { method: 'POST', body: {
           symbol: s.symbol, direction: s.opt.dir,
           amount: s.opt.amount, duration: s.opt.dur } });
         msg.className = 'msg ok'; msg.textContent = t('sec.placed');
-        R.toast(t('sec.placed'), 'ok');
+        // 已下单合约直接登记到 tracked，便于结算时弹窗
+        if (c && c.id) trackedActive.add(c.id);
+        const dirTxt = c.direction === 'up' ? '▲ ' + t('sec.dir.up') : '▼ ' + t('sec.dir.down');
+        const settleAt = c.settle_at ? R.fmtTs(c.settle_at) : '—';
+        showOptModal(t('sec.placed') + ` · #${c.id || ''}`,
+          `<div class="opt-placed">
+             <div class="kv">
+               <label>${t('sec.col.symbol')}</label><b>${c.symbol}</b>
+               <label>${t('sec.direction')}</label><b class="${c.direction === 'up' ? 'buy' : 'sell'}">${dirTxt}</b>
+               <label>${t('sec.col.duration')}</label><b>${c.duration}s</b>
+               <label>${t('sec.amount')}</label><b>$${R.fmt(c.amount)}</b>
+               <label>${t('sec.open_price')}</label><b>${R.fmt(c.open_price)}</b>
+               <label>${t('sec.payout')}</label><b>+${((c.payout_rate || payoutOf(c.duration)) * 100).toFixed(0)}%</b>
+               <label>${t('sec.col.settle')}</label><b>${settleAt}</b>
+             </div>
+           </div>`, 4000);
         await refreshOpt(); refreshAll();
       } catch (err) {
         msg.className = 'msg'; msg.textContent = err.message;
@@ -596,6 +611,25 @@ async function viewTrading(el, params) {
     });
     pane.querySelector('#spot-link-opt').addEventListener('click', openSpotModal);
   }
+  // 期权弹窗：通用工具，title + 内容 HTML，autoMs > 0 自动关闭
+  function showOptModal(title, html, autoMs) {
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = `<div class="modal opt-modal">
+      <div class="modal-head"><h3>${title}</h3><button class="x" data-close>×</button></div>
+      <div class="modal-body">${html}</div></div>`;
+    document.body.appendChild(back);
+    const close = () => back.remove();
+    back.querySelector('[data-close]').addEventListener('click', close);
+    back.addEventListener('click', (e) => { if (e.target === back) close(); });
+    if (autoMs > 0) setTimeout(close, autoMs);
+    return back;
+  }
+
+  // 跟踪本会话内已展示过结果弹窗的合约 id；以及当前活跃合约 id 集合
+  const trackedActive = new Set();
+  const shownResultIds = new Set();
+
   async function refreshOpt() {
     if (!R.auth().token) return;
     try {
@@ -603,9 +637,39 @@ async function viewTrading(el, params) {
         R.api('/api/seconds/orders/active'),
         R.api('/api/seconds/orders?limit=50'),
       ]);
+      const newActiveIds = new Set(active.map(c => c.id));
+      // 上一轮跟踪的活跃合约里，本轮已不再活跃 → 找结算记录弹窗
+      const justSettled = [];
+      trackedActive.forEach(id => {
+        if (!newActiveIds.has(id) && !shownResultIds.has(id)) {
+          const r = history.find(c => c.id === id);
+          if (r && (r.status === 'won' || r.status === 'lost')) justSettled.push(r);
+        }
+      });
+      trackedActive.clear();
+      newActiveIds.forEach(id => trackedActive.add(id));
       s.opt.active = active;
       s.opt.history = history.filter(c => c.status !== 'open');
       if (s.pane === 'opt_active' || s.pane === 'opt_history') renderTable();
+      justSettled.forEach(c => {
+        shownResultIds.add(c.id);
+        const won = c.status === 'won';
+        const pnl = c.pnl || 0;
+        const dirTxt = c.direction === 'up' ? '▲ ' + t('sec.dir.up') : '▼ ' + t('sec.dir.down');
+        showOptModal(
+          `${won ? t('sec.status.won') : t('sec.status.lost')} · #${c.id}`,
+          `<div class="opt-result ${won ? 'win' : 'lose'}">
+             <div class="opt-result-headline">${won ? '🎉' : '💔'} ${won ? '+' : ''}$${R.fmt(pnl)}</div>
+             <div class="kv">
+               <label>${t('sec.col.symbol')}</label><b>${c.symbol}</b>
+               <label>${t('sec.direction')}</label><b class="${c.direction === 'up' ? 'buy' : 'sell'}">${dirTxt}</b>
+               <label>${t('sec.col.duration')}</label><b>${c.duration}s</b>
+               <label>${t('sec.amount')}</label><b>$${R.fmt(c.amount)}</b>
+               <label>${t('sec.open_price')}</label><b>${R.fmt(c.open_price)}</b>
+               <label>${t('sec.settle_price')}</label><b>${R.fmt(c.settle_price)}</b>
+             </div>
+           </div>`);
+      });
     } catch (_) {}
   }
 

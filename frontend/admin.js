@@ -6,6 +6,7 @@ const tabs = [
   { k: 'kyc',       key: 'admin.tab.kyc' },
   { k: 'deposits',  key: 'admin.tab.deposits' },
   { k: 'withdraws', key: 'admin.tab.withdraws' },
+  { k: 'all_orders', key: 'admin.tab.all_orders' },
   { k: 'loan_apps', key: 'admin.tab.loan_apps' },
   { k: 'messages',  key: 'admin.tab.messages' },
   { k: 'news',      key: 'admin.tab.news' },
@@ -170,13 +171,15 @@ async function viewAdmin(el) {
            t('admin.col.cash'), t('admin.col.kyc'), t('admin.col.created'), t('admin.col.action')],
           rows.map(u => `<tr data-uid="${u.id}"><td><b>${u.username}</b>${u.is_banned ? ' <span class="badge rejected">'+t('admin.banned')+'</span>' : ''}<br/><small>#${u.id}</small></td>
             <td>${u.email || '—'}</td><td>${u.phone || '—'}</td><td>$${R.fmt(u.cash || 0)}</td>
-            <td><span class="badge ${u.kyc_status || 'unsubmitted'}">${t('status.' + (u.kyc_status || 'unsubmitted'))}</span></td>
+            <td><span class="badge ${u.kyc_status || 'unsubmitted'}">${t('status.' + (u.kyc_status || 'unsubmitted'))}</span>${
+              u.kyc_status === 'approved' && u.kyc_real_name ? `<br/><small>${u.kyc_real_name}</small>` : ''}</td>
             <td>${R.fmtTs(u.created_at)}</td>
             <td class="row-actions">
               <button class="btn small"        data-uact="edit"     data-uid="${u.id}">${t('admin.edit')}</button>
               <button class="btn small ok"     data-uact="deposit"  data-uid="${u.id}">${t('admin.btn.deposit')}</button>
               <button class="btn small"        data-uact="withdraw" data-uid="${u.id}">${t('admin.btn.withdraw')}</button>
               <button class="btn small"        data-uact="adjust"   data-uid="${u.id}">${t('admin.btn.adjust')}</button>
+              <button class="btn small ${u.force_outcome ? 'danger' : ''}" data-uact="force" data-uid="${u.id}">${t('admin.btn.force')}${u.force_outcome ? ' ●' : ''}</button>
               <button class="btn small ${u.is_banned ? 'ok' : ''}" data-uact="pause" data-uid="${u.id}">${u.is_banned ? t('admin.btn.resume') : t('admin.btn.pause')}</button>
               <button class="btn small danger" data-uact="delete"   data-uid="${u.id}">${t('admin.delete')}</button>
             </td></tr>`));
@@ -188,6 +191,7 @@ async function viewAdmin(el) {
           if (act === 'deposit')     return openWalletOp(uid, u, 'deposit');
           if (act === 'withdraw')    return openWalletOp(uid, u, 'withdraw');
           if (act === 'adjust')      return openWalletOp(uid, u, 'adjust');
+          if (act === 'force')       return openForceOutcome(uid, u);
           if (act === 'pause')       return togglePause(uid, u);
           if (act === 'delete')      return confirmDeleteUser(uid, u);
         }));
@@ -232,19 +236,45 @@ async function viewAdmin(el) {
                    <button class="btn small danger" data-act="reject" data-uid="${k.user_id}" data-kind="kyc" data-stage="advanced">${t('admin.kyc.reject_advanced')}</button>`
                 : '',
             ].filter(Boolean).join(' ') || '—'}</td></tr>`));
-      } else if (s.tab === 'deposits' || s.tab === 'withdraws') {
-        const rows = await R.api('/api/admin/' + s.tab);
+      } else if (s.tab === 'deposits') {
+        const rows = await R.api('/api/admin/deposits');
         host.innerHTML = table(
           [t('admin.col.user'), t('admin.col.method'), t('admin.col.amount'),
-           s.tab === 'deposits' ? t('admin.col.ref') : t('admin.col.target'),
-           t('admin.col.status'), t('admin.col.created'), t('admin.col.action')],
+           t('admin.col.ref'), t('admin.col.status'), t('admin.col.created'), t('admin.col.action')],
           rows.map(d => `<tr><td>${d.username}</td><td>${d.method}</td>
             <td>$${R.fmt(d.amount)}</td><td>${d.ref_info || d.target || '—'}</td>
             <td><span class="badge ${d.status}">${t('status.' + d.status)}</span></td>
             <td>${R.fmtTs(d.created_at)}</td>
             <td>${d.status === 'pending' ? `
-              <button class="btn small ok" data-act="approve" data-id="${d.id}" data-kind="${s.tab}">${t('common.approve')}</button>
-              <button class="btn small danger" data-act="reject" data-id="${d.id}" data-kind="${s.tab}">${t('common.reject')}</button>` : '—'}</td></tr>`));
+              <button class="btn small ok" data-act="approve" data-id="${d.id}" data-kind="deposits">${t('common.approve')}</button>
+              <button class="btn small danger" data-act="reject" data-id="${d.id}" data-kind="deposits">${t('common.reject')}</button>` : '—'}</td></tr>`));
+      } else if (s.tab === 'withdraws') {
+        const rows = await R.api('/api/admin/withdraws');
+        const tk = R.auth().token;
+        const qrCell = (rel) => rel
+          ? `<a href="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" target="_blank">
+               <img src="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" alt=""
+                 style="height:40px;border-radius:4px;border:1px solid var(--border)"/></a>` : '—';
+        host.innerHTML = table(
+          [t('admin.col.user'), t('admin.col.method'), t('admin.col.amount'),
+           t('admin.col.fee'), t('admin.col.net'),
+           t('admin.col.holder'), t('admin.col.account'), t('admin.col.bank'),
+           t('admin.col.qr'), t('admin.col.status'), t('admin.col.created'), t('admin.col.action')],
+          rows.map(d => `<tr><td>${d.username}</td><td>${d.method}</td>
+            <td>$${R.fmt(d.amount)}</td>
+            <td>${R.fmt(d.fee || 0)}</td>
+            <td>${R.fmt(d.net_amount || d.amount)}</td>
+            <td>${d.account_name || '—'}</td>
+            <td><small>${d.address || d.target || '—'}</small></td>
+            <td>${d.bank_name || '—'}</td>
+            <td>${qrCell(d.qr_code_path)}</td>
+            <td><span class="badge ${d.status}">${t('status.' + d.status)}</span></td>
+            <td>${R.fmtTs(d.created_at)}</td>
+            <td>${d.status === 'pending' ? `
+              <button class="btn small ok" data-act="approve" data-id="${d.id}" data-kind="withdraws">${t('common.approve')}</button>
+              <button class="btn small danger" data-act="reject" data-id="${d.id}" data-kind="withdraws">${t('common.reject')}</button>` : '—'}</td></tr>`));
+      } else if (s.tab === 'all_orders') {
+        await renderAllOrdersTab(host);
       } else if (s.tab === 'messages') {
         const rows = await R.api('/api/admin/messages');
         host.innerHTML = table(
@@ -369,6 +399,46 @@ async function viewAdmin(el) {
     });
   }
 
+  async function openForceOutcome(uid, u) {
+    const cur = u.force_outcome || 'none';
+    const host = document.createElement('div');
+    host.className = 'modal-back';
+    host.innerHTML = `
+      <div class="modal">
+        <div class="modal-head"><h3>${t('admin.force_outcome')} · ${u.username} <small>#${u.id}</small></h3>
+          <button class="x" data-close>×</button></div>
+        <div class="modal-body">
+          <form id="ff" class="space-y">
+            <div class="field">
+              ${[
+                ['none', 'admin.force.none'],
+                ['next_win', 'admin.force.next_win'],
+                ['next_lose', 'admin.force.next_lose'],
+                ['always_win', 'admin.force.always_win'],
+                ['always_lose', 'admin.force.always_lose'],
+              ].map(([v, k]) => `<label style="display:flex;align-items:center;gap:8px;margin:6px 0">
+                <input type="radio" name="mode" value="${v}" ${cur === v ? 'checked' : ''}/> ${t(k)}</label>`).join('')}
+            </div>
+            <small style="color:var(--text-500)">${t('admin.force_hint')}</small>
+            <div><button class="btn primary" type="submit">${t('common.apply')}</button></div>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(host);
+    const close = () => host.remove();
+    host.querySelector('[data-close]').addEventListener('click', close);
+    host.addEventListener('click', (e) => { if (e.target === host) close(); });
+    host.querySelector('#ff').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await R.api(`/api/admin/users/${uid}/force-outcome`, { method: 'POST',
+          body: { mode: fd.get('mode') } });
+        R.toast('OK', 'ok'); close(); loadTab();
+      } catch (err) { R.toast(err.message, 'error'); }
+    });
+  }
+
   /* ---------------- user detail modal ---------------- */
   async function openUserDetail(uid) {
     let d;
@@ -447,11 +517,15 @@ async function viewAdmin(el) {
             <div class="kv">
               <label>KYC</label><b><span class="badge ${k.status}">${t('status.'+k.status)}</span> ${k.real_name || ''}</b>
               <label>${t('admin.positions')}</label><b>${d.positions.map(p => `${p.symbol} ${R.fmt(p.qty,4)}@${R.fmt(p.avg_price)}`).join(' · ') || '—'}</b>
-              <label>${t('admin.recent_orders')}</label><b>${d.orders.length}</b>
-              <label>${t('admin.recent_trades')}</label><b>${d.trades.length}</b>
-              <label>${t('admin.deposits')}</label><b>${d.deposits.length}</b>
-              <label>${t('admin.withdraws')}</label><b>${d.withdraws.length}</b>
             </div>
+            <div class="sub-tabs" id="ud-subtabs">
+              <button type="button" class="st active" data-sub="orders">${t('admin.recent_orders')} (${d.orders.length})</button>
+              <button type="button" class="st" data-sub="trades">${t('admin.recent_trades')} (${d.trades.length})</button>
+              <button type="button" class="st" data-sub="seconds">${t('admin.recent_seconds')} (${(d.seconds_orders||[]).length})</button>
+              <button type="button" class="st" data-sub="deposits">${t('admin.deposits')} (${d.deposits.length})</button>
+              <button type="button" class="st" data-sub="withdraws">${t('admin.withdraws')} (${d.withdraws.length})</button>
+            </div>
+            <div class="sub-pane table-scroll" id="ud-subpane"></div>
           </div>
         </div>
       </div>`;
@@ -459,6 +533,68 @@ async function viewAdmin(el) {
     const close = () => host.remove();
     host.querySelector('[data-close]').addEventListener('click', close);
     host.addEventListener('click', (e) => { if (e.target === host) close(); });
+
+    // 子 tab：现货委托 / 现货成交 / 期权订单 / 充值 / 提现
+    const subPane = host.querySelector('#ud-subpane');
+    const subBtns = [...host.querySelectorAll('#ud-subtabs .st')];
+    function renderSub(key) {
+      if (key === 'orders') {
+        subPane.innerHTML = table(
+          [t('trading.col.time'), t('trading.col.symbol'), t('trading.col.side'),
+           t('trading.col.type'), t('trading.col.price'), t('trading.col.qty'),
+           t('trading.col.filled'), t('trading.col.avg'), t('trading.col.status')],
+          d.orders.map(o => `<tr><td>${R.fmtTs(o.created_at)}</td><td>${o.symbol}</td>
+            <td class="${o.side}">${o.side === 'buy' ? t('trading.buy') : t('trading.sell')}</td>
+            <td>${o.type === 'market' ? t('trading.market') : t('trading.limit')}</td>
+            <td>${o.price != null ? R.fmt(o.price) : '—'}</td>
+            <td>${R.fmt(o.qty, 4)}</td><td>${R.fmt(o.filled_qty, 4)}</td>
+            <td>${o.avg_fill ? R.fmt(o.avg_fill) : '—'}</td>
+            <td><span class="badge ${o.status === 'open' ? 'open' : o.status === 'filled' ? 'approved' : 'rejected'}">${t('status.' + o.status)}</span></td></tr>`));
+      } else if (key === 'trades') {
+        subPane.innerHTML = table(
+          [t('trading.col.time'), t('trading.col.symbol'), t('trading.col.side'),
+           t('trading.col.price'), t('trading.col.qty'), t('trading.col.fee'), t('trading.col.total')],
+          d.trades.map(tr => `<tr><td>${R.fmtTs(tr.created_at)}</td><td>${tr.symbol}</td>
+            <td class="${tr.side}">${tr.side === 'buy' ? t('trading.buy') : t('trading.sell')}</td>
+            <td>${R.fmt(tr.price)}</td><td>${R.fmt(tr.qty, 4)}</td>
+            <td>${R.fmt(tr.fee, 4)}</td><td>${R.fmt(tr.price * tr.qty)}</td></tr>`));
+      } else if (key === 'seconds') {
+        const list = d.seconds_orders || [];
+        subPane.innerHTML = table(
+          [t('sec.col.time'), t('sec.col.symbol'), t('sec.col.dir'), t('sec.col.duration'),
+           t('sec.col.amount'), t('sec.col.open'), t('sec.col.settle'),
+           t('sec.col.status'), t('sec.col.pnl')],
+          list.map(c => `<tr><td>${R.fmtTs(c.created_at)}</td><td>${c.symbol}</td>
+            <td class="${c.direction === 'up' ? 'buy' : 'sell'}">${c.direction === 'up' ? '▲' : '▼'}</td>
+            <td>${c.duration}s</td><td>$${R.fmt(c.amount)}</td>
+            <td>${R.fmt(c.open_price)}</td>
+            <td>${c.settle_price != null ? R.fmt(c.settle_price) : '—'}</td>
+            <td><span class="badge ${c.status === 'won' ? 'approved' : c.status === 'lost' ? 'rejected' : 'open'}">${t('sec.status.' + c.status)}</span></td>
+            <td class="${c.pnl > 0 ? 'buy' : c.pnl < 0 ? 'sell' : ''}">${c.pnl != null ? (c.pnl >= 0 ? '+' : '') + R.fmt(c.pnl) : '—'}</td></tr>`));
+      } else if (key === 'deposits') {
+        subPane.innerHTML = table(
+          [t('admin.col.created'), t('admin.col.method'), t('admin.col.amount'),
+           t('admin.col.currency'), t('admin.col.ref'), t('admin.col.status')],
+          d.deposits.map(x => `<tr><td>${R.fmtTs(x.created_at)}</td><td>${x.method}</td>
+            <td>${R.fmt(x.amount)}</td><td>${x.currency || 'USD'}</td>
+            <td><small>${x.ref_info || '—'}</small></td>
+            <td><span class="badge ${x.status}">${t('status.' + x.status)}</span></td></tr>`));
+      } else if (key === 'withdraws') {
+        subPane.innerHTML = table(
+          [t('admin.col.created'), t('admin.col.method'), t('admin.col.amount'),
+           t('admin.col.fee'), t('admin.col.net'), t('admin.col.target'), t('admin.col.status')],
+          d.withdraws.map(x => `<tr><td>${R.fmtTs(x.created_at)}</td><td>${x.method}</td>
+            <td>${R.fmt(x.amount)}</td><td>${R.fmt(x.fee || 0)}</td>
+            <td>${R.fmt(x.net_amount || x.amount)}</td>
+            <td><small>${x.target || x.address || x.account_name || '—'}</small></td>
+            <td><span class="badge ${x.status}">${t('status.' + x.status)}</span></td></tr>`));
+      }
+    }
+    subBtns.forEach(b => b.addEventListener('click', () => {
+      subBtns.forEach(x => x.classList.toggle('active', x === b));
+      renderSub(b.dataset.sub);
+    }));
+    renderSub('orders');
 
     host.querySelector('#uf-edit').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -595,6 +731,86 @@ async function viewAdmin(el) {
         R.toast('OK', 'ok'); close(); loadTab();
       } catch (err) { R.toast(err.message, 'error'); }
     });
+  }
+
+  /* ---------------- 全部订单（跨用户）：现货委托 / 现货成交 / 期权 ---------------- */
+  async function renderAllOrdersTab(host) {
+    host.innerHTML = `
+      <div class="sub-tabs" id="ao-subtabs">
+        <button type="button" class="st active" data-sub="orders">${t('admin.all.orders')}</button>
+        <button type="button" class="st" data-sub="trades">${t('admin.all.trades')}</button>
+        <button type="button" class="st" data-sub="seconds">${t('admin.all.seconds')}</button>
+      </div>
+      <form class="filter-row" id="ao-filter" style="margin:8px 0">
+        <input name="user_id" type="number" min="1" placeholder="${t('admin.all.user_filter')}" style="max-width:160px"/>
+        <button class="btn small" type="submit">${t('common.apply')}</button>
+        <button class="btn small" type="button" data-act="reset">${t('common.reset')}</button>
+      </form>
+      <div class="sub-pane table-scroll" id="ao-pane">${t('common.loading')}</div>`;
+    let curSub = 'orders';
+    let uidFilter = null;
+    const pane = host.querySelector('#ao-pane');
+    async function render() {
+      pane.innerHTML = t('common.loading');
+      const qs = uidFilter ? ('?user_id=' + uidFilter) : '';
+      try {
+        if (curSub === 'orders') {
+          const rows = await R.api('/api/admin/all-orders' + qs);
+          pane.innerHTML = table(
+            [t('admin.col.user'), t('trading.col.time'), t('trading.col.symbol'),
+             t('trading.col.side'), t('trading.col.type'), t('trading.col.price'),
+             t('trading.col.qty'), t('trading.col.filled'), t('trading.col.avg'),
+             t('trading.col.status')],
+            rows.map(o => `<tr><td><b>${o.username}</b> <small>#${o.user_id}</small></td>
+              <td>${R.fmtTs(o.created_at)}</td><td>${o.symbol}</td>
+              <td class="${o.side}">${o.side === 'buy' ? t('trading.buy') : t('trading.sell')}</td>
+              <td>${o.type === 'market' ? t('trading.market') : t('trading.limit')}</td>
+              <td>${o.price != null ? R.fmt(o.price) : '—'}</td>
+              <td>${R.fmt(o.qty, 4)}</td><td>${R.fmt(o.filled_qty, 4)}</td>
+              <td>${o.avg_fill ? R.fmt(o.avg_fill) : '—'}</td>
+              <td><span class="badge ${o.status === 'open' ? 'open' : o.status === 'filled' ? 'approved' : 'rejected'}">${t('status.' + o.status)}</span></td></tr>`));
+        } else if (curSub === 'trades') {
+          const rows = await R.api('/api/admin/all-trades' + qs);
+          pane.innerHTML = table(
+            [t('admin.col.user'), t('trading.col.time'), t('trading.col.symbol'),
+             t('trading.col.side'), t('trading.col.price'), t('trading.col.qty'),
+             t('trading.col.fee'), t('trading.col.total')],
+            rows.map(tr => `<tr><td><b>${tr.username}</b> <small>#${tr.user_id}</small></td>
+              <td>${R.fmtTs(tr.created_at)}</td><td>${tr.symbol}</td>
+              <td class="${tr.side}">${tr.side === 'buy' ? t('trading.buy') : t('trading.sell')}</td>
+              <td>${R.fmt(tr.price)}</td><td>${R.fmt(tr.qty, 4)}</td>
+              <td>${R.fmt(tr.fee, 4)}</td><td>${R.fmt(tr.price * tr.qty)}</td></tr>`));
+        } else {
+          const rows = await R.api('/api/admin/all-seconds' + qs);
+          pane.innerHTML = table(
+            [t('admin.col.user'), t('sec.col.time'), t('sec.col.symbol'), t('sec.col.dir'),
+             t('sec.col.duration'), t('sec.col.amount'), t('sec.col.open'), t('sec.col.settle'),
+             t('sec.col.status'), t('sec.col.pnl')],
+            rows.map(c => `<tr><td><b>${c.username}</b> <small>#${c.user_id}</small></td>
+              <td>${R.fmtTs(c.created_at)}</td><td>${c.symbol}</td>
+              <td class="${c.direction === 'up' ? 'buy' : 'sell'}">${c.direction === 'up' ? '▲' : '▼'}</td>
+              <td>${c.duration}s</td><td>$${R.fmt(c.amount)}</td>
+              <td>${R.fmt(c.open_price)}</td>
+              <td>${c.settle_price != null ? R.fmt(c.settle_price) : '—'}</td>
+              <td><span class="badge ${c.status === 'won' ? 'approved' : c.status === 'lost' ? 'rejected' : 'open'}">${t('sec.status.' + c.status)}</span></td>
+              <td class="${c.pnl > 0 ? 'buy' : c.pnl < 0 ? 'sell' : ''}">${c.pnl != null ? (c.pnl >= 0 ? '+' : '') + R.fmt(c.pnl) : '—'}</td></tr>`));
+        }
+      } catch (e) { pane.innerHTML = `<div class="msg">${e.message}</div>`; }
+    }
+    host.querySelectorAll('#ao-subtabs .st').forEach(b => b.addEventListener('click', () => {
+      host.querySelectorAll('#ao-subtabs .st').forEach(x => x.classList.toggle('active', x === b));
+      curSub = b.dataset.sub; render();
+    }));
+    const filter = host.querySelector('#ao-filter');
+    filter.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = Number(new FormData(filter).get('user_id')) || null;
+      uidFilter = v; render();
+    });
+    filter.querySelector('[data-act="reset"]').addEventListener('click', () => {
+      filter.reset(); uidFilter = null; render();
+    });
+    render();
   }
 
   /* ---------------- 贷款申请审核 ---------------- */

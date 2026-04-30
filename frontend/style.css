@@ -654,6 +654,26 @@ table.list td.row-actions .btn:last-child { margin-right: 0; }
   .modal-body.grid-2 { grid-template-columns: 1fr; }
 }
 
+/* 期权下单/结算结果弹窗 */
+.modal.opt-modal { width: 420px; }
+.opt-placed .kv, .opt-result .kv { grid-template-columns: 110px 1fr; gap: 8px 14px; font-size: 14px; }
+.opt-placed .kv b.buy, .opt-result .kv b.buy { color: #26d17c; }
+.opt-placed .kv b.sell, .opt-result .kv b.sell { color: #ff5a7a; }
+.opt-result-headline { font-size: 28px; font-weight: 700; text-align: center;
+  padding: 16px 0 18px; letter-spacing: .5px; }
+.opt-result.win .opt-result-headline { color: #26d17c; }
+.opt-result.lose .opt-result-headline { color: #ff5a7a; }
+
+/* 用户详情 modal 子 tab */
+.sub-tabs { display: flex; gap: 4px; margin: 12px 0 10px; flex-wrap: wrap; }
+.sub-tabs .st { background: var(--bg-1); border: 1px solid var(--line); color: var(--text-500);
+  padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.sub-tabs .st.active { background: var(--navy-900); color: #fff; border-color: var(--navy-900); }
+.sub-pane table.list { font-size: 12px; }
+.sub-pane table.list td, .sub-pane table.list th { padding: 6px 8px; }
+
+
+
 /* ============ Finance plans ============ */
 .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 24px 0; }
 .plan-card { background: #fff; border: 1px solid var(--line); border-radius: 14px;

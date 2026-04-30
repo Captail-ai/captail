@@ -622,7 +622,9 @@ app.get('/api/admin/overview', adminMiddleware, (_, res) => {
 app.get('/api/admin/users', adminMiddleware, (_, res) => {
   const rows = db.prepare(`
     SELECT u.id, u.username, u.email, u.phone, u.nickname, u.created_at, u.is_admin,
-           u.kyc_level, a.spot_cash, a.option_cash, k.status AS kyc_status
+           u.is_banned, u.force_outcome,
+           u.kyc_level, a.spot_cash, a.option_cash,
+           k.status AS kyc_status, k.real_name AS kyc_real_name
     FROM users u
     LEFT JOIN accounts a ON a.user_id = u.id
     LEFT JOIN kyc k ON k.user_id = u.id
@@ -873,6 +875,38 @@ app.post('/api/admin/users/:id/force-outcome', adminMiddleware, (req, res) => {
     logAdminOp(req, 'force_outcome.set', uid, { before, after: value });
     res.json({ force_outcome: value });
   } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ---------- admin: 全部订单/成交/期权（跨用户列表，可选 user_id 过滤） ----------
+function parseListQuery(req) {
+  const limit  = Math.min(Math.max(Number(req.query.limit)  || 100, 1), 500);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const uid    = Number(req.query.user_id) || null;
+  return { limit, offset, uid };
+}
+app.get('/api/admin/all-orders', adminMiddleware, (req, res) => {
+  const { limit, offset, uid } = parseListQuery(req);
+  const where = uid ? 'WHERE o.user_id=?' : '';
+  const sql = `SELECT o.*, u.username FROM orders o JOIN users u ON u.id=o.user_id
+    ${where} ORDER BY o.id DESC LIMIT ? OFFSET ?`;
+  const args = uid ? [uid, limit, offset] : [limit, offset];
+  res.json(db.prepare(sql).all(...args));
+});
+app.get('/api/admin/all-trades', adminMiddleware, (req, res) => {
+  const { limit, offset, uid } = parseListQuery(req);
+  const where = uid ? 'WHERE t.user_id=?' : '';
+  const sql = `SELECT t.*, u.username FROM trades t JOIN users u ON u.id=t.user_id
+    ${where} ORDER BY t.id DESC LIMIT ? OFFSET ?`;
+  const args = uid ? [uid, limit, offset] : [limit, offset];
+  res.json(db.prepare(sql).all(...args));
+});
+app.get('/api/admin/all-seconds', adminMiddleware, (req, res) => {
+  const { limit, offset, uid } = parseListQuery(req);
+  const where = uid ? 'WHERE s.user_id=?' : '';
+  const sql = `SELECT s.*, u.username FROM second_contracts s JOIN users u ON u.id=s.user_id
+    ${where} ORDER BY s.id DESC LIMIT ? OFFSET ?`;
+  const args = uid ? [uid, limit, offset] : [limit, offset];
+  res.json(db.prepare(sql).all(...args));
 });
 
 // ---------- admin: audit log ----------
