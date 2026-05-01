@@ -33,7 +33,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg-0); color: var(--text-900);
   font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
-  font-size: 14px; line-height: 1.55; }
+  font-size: 14px; line-height: 1.55;
+  /* 防止移动端任何元素横向溢出导致 iOS Safari 自动缩小整页（右上角出现空白条带） */
+  overflow-x: hidden; max-width: 100vw; }
 a { color: var(--blue-500); text-decoration: none; }
 a:hover { color: var(--blue-400); }
 button { font-family: inherit; cursor: pointer; }
@@ -191,7 +193,8 @@ section.alt { background: var(--bg-1); }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--blue-400);
   box-shadow: 0 0 0 3px rgba(76,139,239,.15); }
 .field small { color: var(--text-500); font-size: 12px; }
-.msg { min-height: 18px; font-size: 13px; color: var(--down); }
+.msg { min-height: 18px; font-size: 13px; color: var(--down);
+  word-break: break-word; overflow-wrap: anywhere; }
 .msg.ok { color: var(--up); }
 
 .tabs-pill { display: inline-flex; background: var(--bg-2); padding: 4px;
