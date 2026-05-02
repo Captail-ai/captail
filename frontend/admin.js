@@ -251,10 +251,16 @@ async function viewAdmin(el) {
       } else if (s.tab === 'withdraws') {
         const rows = await R.api('/api/admin/withdraws');
         const tk = R.auth().token;
-        const qrCell = (rel) => rel
-          ? `<a href="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" target="_blank">
-               <img src="/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}" alt=""
-                 style="height:40px;border-radius:4px;border:1px solid var(--border)"/></a>` : '—';
+        const qrCell = (rel) => {
+          if (!rel) return '<span style="color:var(--text-500)">—</span>';
+          const url = `/api/admin/uploads/${rel}?token=${encodeURIComponent(tk || '')}`;
+          // onerror 时回落显示文件名链接，方便识别是 404 还是 NULL
+          const fallback = `<a href="${url}" target="_blank" style="font-size:11px;color:var(--down)" title="${rel}">${rel.split('/').pop()}</a>`;
+          return `<a href="${url}" target="_blank" title="${rel}">
+            <img src="${url}" alt="${rel}"
+              onerror="this.outerHTML='${fallback.replace(/'/g, '&#39;')}'"
+              style="height:40px;border-radius:4px;border:1px solid var(--border)"/></a>`;
+        };
         host.innerHTML = table(
           [t('admin.col.user'), t('admin.col.method'), t('admin.col.amount'),
            t('admin.col.fee'), t('admin.col.net'),
