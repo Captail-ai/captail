@@ -15,7 +15,7 @@ const mail = require('./mail');
 const telegram = require('./telegram');
 const ratelimit = require('./ratelimit');
 const { register, login, authMiddleware, adminMiddleware, ensureAdmin, tryAuth,
-        logSecurityEvent } = require('./auth');
+        logSecurityEvent, purgeUnverifiedUser } = require('./auth');
 
 const app = express();
 app.use(cors());
@@ -104,33 +104,41 @@ function logAdminOp(req, action, targetUserId, details) {
 // ---------- auth ----------
 function genCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
-function issueVerificationCode(userId, email) {
+// 写入验证码并发送邮件；返回 { code, sent } —— sent 为底层发送结果
+async function issueVerificationCode(userId, email) {
   const now = Date.now();
   const code = genCode();
   db.prepare(`INSERT INTO email_verifications(user_id, code, expires_at, created_at)
     VALUES(?, ?, ?, ?)`).run(userId, code, now + 10 * 60 * 1000, now);
-  mail.sendVerificationCode(email, code);
-  return code;
+  const sent = await mail.sendVerificationCode(email, code);
+  return { code, sent };
 }
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { username, password, email } = req.body || {};
+  let r;
   try {
-    const r = register(username, password, email);
-    logSecurityEvent(req, 'auth.register.success',
-      { userId: r.user.id, username: r.user.username });
-    if (!r.user.email_verified) {
-      const code = issueVerificationCode(r.user.id, email);
-      const out = { user: r.user, needs_verification: true };
-      if (mail.devEcho()) out.dev_code = code;
-      return res.json(out);
-    }
-    res.json(r);
+    r = register(username, password, email);
   } catch (e) {
     logSecurityEvent(req, 'auth.register.failure',
       { username, details: { reason: e.message } });
-    res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: e.message });
   }
+  logSecurityEvent(req, 'auth.register.success',
+    { userId: r.user.id, username: r.user.username });
+  if (r.user.email_verified) return res.json(r);
+
+  // 未验证流程：发送验证码邮件，失败则回滚刚创建的用户行
+  const { code, sent } = await issueVerificationCode(r.user.id, email);
+  if (sent && sent.ok === false) {
+    purgeUnverifiedUser(r.user.id);
+    logSecurityEvent(req, 'auth.register.mail_failed',
+      { userId: r.user.id, username, details: { error: sent.error || 'unknown' } });
+    return res.status(503).json({ error: '验证码邮件发送失败，请稍后重试' });
+  }
+  const out = { user: r.user, needs_verification: true };
+  if (mail.devEcho()) out.dev_code = code;
+  res.json(out);
 });
 
 app.post('/api/auth/verify-email', (req, res) => {
@@ -155,7 +163,7 @@ app.post('/api/auth/verify-email', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/auth/resend-code', (req, res) => {
+app.post('/api/auth/resend-code', async (req, res) => {
   const { username } = req.body || {};
   const row = db.prepare('SELECT id, email, email_verified FROM users WHERE username=?').get(username);
   if (!row) return res.status(400).json({ error: '用户不存在' });
@@ -168,7 +176,10 @@ app.post('/api/auth/resend-code', (req, res) => {
     return res.status(429).json({ error: '发送过于频繁，请稍后再试',
       retryAfter: Math.ceil((30_000 - (Date.now() - last.created_at)) / 1000) });
   }
-  const code = issueVerificationCode(row.id, row.email);
+  const { code, sent } = await issueVerificationCode(row.id, row.email);
+  if (sent && sent.ok === false) {
+    return res.status(503).json({ error: '验证码邮件发送失败，请稍后重试' });
+  }
   logSecurityEvent(req, 'auth.verify.resend', { userId: row.id, username });
   const out = { ok: true };
   if (mail.devEcho()) out.dev_code = code;

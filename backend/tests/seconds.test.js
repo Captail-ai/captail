@@ -12,6 +12,8 @@ const TMP_DB = path.join(os.tmpdir(), `seconds-test-${Date.now()}-${process.pid}
 process.env.DB_FILE = TMP_DB;
 process.env.JWT_SECRET = 'test-secret';
 process.env.DEV_AUTO_VERIFY = '1';
+// 本测试套依赖期权钱包余额下单，保留旧 100000 USD 试玩金行为
+process.env.SIGNUP_OPTION_BONUS = '100000';
 
 const request = require('supertest');
 const { app } = require('../server');

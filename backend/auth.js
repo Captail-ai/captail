@@ -43,23 +43,42 @@ function ensureAdmin() {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// 删除一个未验证的僵尸账号及其关联表，便于让出 username/email 给新注册
+function purgeUnverifiedUser(uid) {
+  db.transaction(() => {
+    db.prepare('DELETE FROM email_verifications WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM accounts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM users WHERE id=? AND email_verified=0 AND is_admin=0').run(uid);
+  })();
+}
+
 function register(username, password, email) {
   if (!username || username.length < 3) throw new Error('用户名至少 3 个字符');
   if (!password || password.length < 6) throw new Error('密码至少 6 个字符');
   if (!email || !EMAIL_RE.test(email))  throw new Error('请填写有效的邮箱');
-  const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-  if (exists) throw new Error('用户名已被占用');
-  const emailTaken = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (emailTaken) throw new Error('邮箱已被占用');
+  // 用户名/邮箱冲突时：已验证账号 → 拒绝；未验证账号 → 视为僵尸记录直接覆盖
+  const exists = db.prepare(
+    'SELECT id, email_verified, is_admin FROM users WHERE username = ?').get(username);
+  if (exists) {
+    if (exists.is_admin || exists.email_verified) throw new Error('用户名已被占用');
+    purgeUnverifiedUser(exists.id);
+  }
+  const emailTaken = db.prepare(
+    'SELECT id, email_verified, is_admin FROM users WHERE email = ?').get(email);
+  if (emailTaken) {
+    if (emailTaken.is_admin || emailTaken.email_verified) throw new Error('邮箱已被占用');
+    purgeUnverifiedUser(emailTaken.id);
+  }
   const hash = bcrypt.hashSync(password, 10);
   const now = Date.now();
   const autoVerify = process.env.DEV_AUTO_VERIFY === '1' ? 1 : 0;
+  // 期权钱包试玩金额度可通过 SIGNUP_OPTION_BONUS 环境变量配置；默认 0
+  const bonus = Math.max(0, Number(process.env.SIGNUP_OPTION_BONUS) || 0);
   const info = db.prepare(
     `INSERT INTO users(username, password, email, email_verified, created_at) VALUES (?,?,?,?,?)`
   ).run(username, hash, email, autoVerify, now);
-  // 赠送 100,000 USD 试玩金 — 进入期权钱包（现货钱包仍为 0，需 KYC 后充值）
   db.prepare('INSERT INTO accounts(user_id, spot_cash, option_cash) VALUES (?, 0, ?)')
-    .run(info.lastInsertRowid, 100000);
+    .run(info.lastInsertRowid, bonus);
   const user = { id: info.lastInsertRowid, username, email_verified: !!autoVerify };
   // 仅当账号已完成邮箱验证时，才返回可用 token
   const token = autoVerify ? signToken({ id: user.id, username, is_admin: 0 }) : null;
@@ -120,5 +139,5 @@ function tryAuth(req) {
 
 module.exports = {
   register, login, authMiddleware, adminMiddleware, ensureAdmin, tryAuth,
-  logSecurityEvent,
+  logSecurityEvent, purgeUnverifiedUser,
 };

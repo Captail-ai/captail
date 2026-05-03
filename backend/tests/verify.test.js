@@ -87,4 +87,45 @@ describe('email verification flow', () => {
     expect(r.status).toBe(429);
     expect(r.body.retryAfter).toBeGreaterThan(0);
   });
+
+  test('mail send failure rolls back the user so the username is reusable', async () => {
+    // 让下一次发邮件返回失败
+    mail._setTransport(() => ({ ok: false, error: 'smtp down' }));
+    const uname3 = 'm_' + Date.now();
+    const fail = await request(app).post('/api/register')
+      .send({ username: uname3, password: 'abcdef', email: `${uname3}@example.com` });
+    expect(fail.status).toBe(503);
+    // 恢复成功的发送通道并立即重试 —— 应该通过（说明上一次的僵尸记录已清除）
+    mail._setTransport((m) => { mailbox.push(m); return { ok: true }; });
+    const ok = await request(app).post('/api/register')
+      .send({ username: uname3, password: 'abcdef', email: `${uname3}@example.com` });
+    expect(ok.status).toBe(200);
+    expect(ok.body.needs_verification).toBe(true);
+  });
+
+  test('re-register over an unverified record succeeds (zombie cleanup)', async () => {
+    const uname4 = 'z_' + Date.now();
+    const eml = `${uname4}@example.com`;
+    const r1 = await request(app).post('/api/register')
+      .send({ username: uname4, password: 'abcdef', email: eml });
+    expect(r1.status).toBe(200);
+    // 不去验证，直接再次注册同 username/email：应允许覆盖
+    const r2 = await request(app).post('/api/register')
+      .send({ username: uname4, password: 'newpass', email: eml });
+    expect(r2.status).toBe(200);
+    expect(r2.body.needs_verification).toBe(true);
+  });
+
+  test('default signup option_cash is 0 (no welcome bonus)', async () => {
+    const db = require('../db');
+    const uname5 = 'b_' + Date.now();
+    const r = await request(app).post('/api/register')
+      .send({ username: uname5, password: 'abcdef', email: `${uname5}@example.com` });
+    expect(r.status).toBe(200);
+    const acc = db.prepare(
+      `SELECT a.spot_cash, a.option_cash FROM accounts a
+       JOIN users u ON u.id=a.user_id WHERE u.username=?`).get(uname5);
+    expect(acc.spot_cash).toBe(0);
+    expect(acc.option_cash).toBe(0);
+  });
 });

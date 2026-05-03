@@ -12,6 +12,8 @@ const TMP_DB = path.join(os.tmpdir(), `metals-test-${Date.now()}-${process.pid}.
 process.env.DB_FILE = TMP_DB;
 process.env.JWT_SECRET = 'test-secret';
 process.env.DEV_AUTO_VERIFY = '1';
+// 保留旧行为：本测试套基于 100000 USD 期权钱包试玩金断言资金调整
+process.env.SIGNUP_OPTION_BONUS = '100000';
 
 const request = require('supertest');
 const { app } = require('../server');
