@@ -12,6 +12,8 @@ const TMP_DB = path.join(os.tmpdir(), `metals-verify-${Date.now()}-${process.pid
 process.env.DB_FILE = TMP_DB;
 process.env.JWT_SECRET = 'test-secret';
 process.env.MAIL_DEV_ECHO = '1'; // so the server hands back the code in register/resend
+// 禁用未验证账号 60s 冷却，便于在单测中连续重注册
+process.env.REGISTER_REUSE_COOLDOWN_MS = '0';
 
 const request = require('supertest');
 const mail = require('../mail');
@@ -114,6 +116,27 @@ describe('email verification flow', () => {
       .send({ username: uname4, password: 'newpass', email: eml });
     expect(r2.status).toBe(200);
     expect(r2.body.needs_verification).toBe(true);
+  });
+
+  test('cooldown blocks accidental double-submit from wiping the first code', async () => {
+    // 临时启用冷却（默认 60s，本测试用 5s 够了）
+    const prev = process.env.REGISTER_REUSE_COOLDOWN_MS;
+    process.env.REGISTER_REUSE_COOLDOWN_MS = '5000';
+    const uname6 = 'd_' + Date.now();
+    const eml = `${uname6}@example.com`;
+    const r1 = await request(app).post('/api/register')
+      .send({ username: uname6, password: 'abcdef', email: eml });
+    expect(r1.status).toBe(200);
+    const codeBefore = r1.body.dev_code;
+    // 立即重注册：应被冷却拒绝，且 r1 的 code 仍然有效
+    const r2 = await request(app).post('/api/register')
+      .send({ username: uname6, password: 'abcdef', email: eml });
+    expect(r2.status).toBe(400);
+    expect(r2.body.error).toMatch(/刚刚注册/);
+    const v = await request(app).post('/api/auth/verify-email')
+      .send({ username: uname6, code: codeBefore });
+    expect(v.status).toBe(200);
+    process.env.REGISTER_REUSE_COOLDOWN_MS = prev;
   });
 
   test('default signup option_cash is 0 (no welcome bonus)', async () => {

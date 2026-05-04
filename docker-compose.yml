@@ -17,7 +17,7 @@ services:
       DB_FILE: /app/data/exchange.db
       LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
       LOGIN_FAIL_WINDOW: ${LOGIN_FAIL_WINDOW:-600}
-      LOGIN_LOCK_SECONDS: ${LOGIN_LOCK_SECONDS:-900}
+      LOGIN_LOCK_SECONDS: ${LOGIN_LOCK_SECONDS:-60}
       DEV_AUTO_VERIFY: ${DEV_AUTO_VERIFY:-0}
       MAIL_DEV_ECHO: ${MAIL_DEV_ECHO:-0}
       MAIL_FROM: ${MAIL_FROM:-Captail <captailcn@outlook.com>}

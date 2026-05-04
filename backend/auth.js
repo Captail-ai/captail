@@ -56,21 +56,32 @@ function register(username, password, email) {
   if (!username || username.length < 3) throw new Error('用户名至少 3 个字符');
   if (!password || password.length < 6) throw new Error('密码至少 6 个字符');
   if (!email || !EMAIL_RE.test(email))  throw new Error('请填写有效的邮箱');
-  // 用户名/邮箱冲突时：已验证账号 → 拒绝；未验证账号 → 视为僵尸记录直接覆盖
+  // 未验证账号冷却：弱网双击 / 表单重复提交时，避免第二次请求把第一次刚生成的
+  // 用户与验证码删掉。仅当旧记录创建已超过该时长才视为僵尸，允许覆盖重建。
+  const cdEnv = process.env.REGISTER_REUSE_COOLDOWN_MS;
+  const reuseCooldown = (cdEnv != null && cdEnv !== '')
+    ? Math.max(0, Number(cdEnv) || 0) : 60_000;
+  const now = Date.now();
+  // 用户名/邮箱冲突时：已验证账号 → 拒绝；未验证且超过冷却 → 覆盖；未验证且在冷却内 → 拒绝并提示
   const exists = db.prepare(
-    'SELECT id, email_verified, is_admin FROM users WHERE username = ?').get(username);
+    'SELECT id, email_verified, is_admin, created_at FROM users WHERE username = ?').get(username);
   if (exists) {
     if (exists.is_admin || exists.email_verified) throw new Error('用户名已被占用');
+    if (now - exists.created_at < reuseCooldown) {
+      throw new Error('该用户名刚刚注册过，请检查邮箱中的验证码或使用「重新发送验证码」');
+    }
     purgeUnverifiedUser(exists.id);
   }
   const emailTaken = db.prepare(
-    'SELECT id, email_verified, is_admin FROM users WHERE email = ?').get(email);
+    'SELECT id, email_verified, is_admin, created_at FROM users WHERE email = ?').get(email);
   if (emailTaken) {
     if (emailTaken.is_admin || emailTaken.email_verified) throw new Error('邮箱已被占用');
+    if (now - emailTaken.created_at < reuseCooldown) {
+      throw new Error('该邮箱刚刚注册过，请检查邮箱中的验证码或使用「重新发送验证码」');
+    }
     purgeUnverifiedUser(emailTaken.id);
   }
   const hash = bcrypt.hashSync(password, 10);
-  const now = Date.now();
   const autoVerify = process.env.DEV_AUTO_VERIFY === '1' ? 1 : 0;
   // 期权钱包试玩金额度可通过 SIGNUP_OPTION_BONUS 环境变量配置；默认 0
   const bonus = Math.max(0, Number(process.env.SIGNUP_OPTION_BONUS) || 0);

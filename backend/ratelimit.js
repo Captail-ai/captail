@@ -4,7 +4,7 @@
  * 环境变量配置：
  *   LOGIN_FAIL_LIMIT   (默认 5)   — 窗口内允许的失败次数
  *   LOGIN_FAIL_WINDOW  (默认 600) — 窗口大小，秒（10 分钟）
- *   LOGIN_LOCK_SECONDS (默认 900) — 触发后锁定时长，秒（15 分钟）
+ *   LOGIN_LOCK_SECONDS (默认 60)  — 触发后锁定时长，秒（1 分钟）
  *
  * key 由调用方决定；实际对「用户名」和「IP」同时计数，
  * 防止攻击者仅切换单一维度即可绕过限流。
@@ -13,7 +13,7 @@
 const cfg = () => ({
   limit:   Number(process.env.LOGIN_FAIL_LIMIT)   || 5,
   window:  (Number(process.env.LOGIN_FAIL_WINDOW)  || 600) * 1000,
-  lock:    (Number(process.env.LOGIN_LOCK_SECONDS) || 900) * 1000,
+  lock:    (Number(process.env.LOGIN_LOCK_SECONDS) || 60)  * 1000,
 });
 
 const buckets = new Map(); // key -> { fails: number[], lockedUntil: number }  失败时间戳列表 + 锁定到期时刻
