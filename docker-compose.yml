@@ -44,6 +44,9 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-80}:80"
+    volumes:
+      # 客服站静态文件目录（www.captailcn-server.com）；只读挂载，宿主放文件即时生效
+      - ${KEFU_DIR:-/usr/kefu}:/usr/share/nginx/kefu:ro
     networks: [captail]
 
 volumes:
