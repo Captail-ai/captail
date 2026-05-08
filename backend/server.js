@@ -18,6 +18,10 @@ const { register, login, authMiddleware, adminMiddleware, ensureAdmin, tryAuth,
         logSecurityEvent, purgeUnverifiedUser } = require('./auth');
 
 const app = express();
+// 前置代理层级：EdgeOne / Cloudflare 在最外，nginx 在容器内 → 默认 2
+// 设置后 req.ip / req.protocol 会从 X-Forwarded-For / X-Forwarded-Proto 取真实值，
+// 限流器才能针对真实客户端 IP 统计而不是代理节点。
+app.set('trust proxy', Number(process.env.TRUST_PROXY) || 2);
 app.use(cors());
 app.use(express.json());
 
