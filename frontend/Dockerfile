@@ -18,5 +18,6 @@ RUN rm -f /usr/share/nginx/html/Dockerfile /usr/share/nginx/html/.dockerignore \
 
 EXPOSE 80
 
+# 默认兜底块对未知 Host 返 444，必须显式带正确 Host 才能命中真实站点
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
+  CMD wget -qO- --header="Host: www.captailcn.com" http://127.0.0.1/ >/dev/null || exit 1
